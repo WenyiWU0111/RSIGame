@@ -81,4 +81,5 @@ empty chat template (`repair`).
 Anything that talks to one particular cluster: queue names, image registries,
 node babysitters, out-of-band job watchers. A run is started by `launch.sh` on
 whatever machine has the cards, and everything it needs is a flag or a config
-key under `[sft]`.
+key under `[sft]` in `configs/default_training.toml`, which is separate from the
+loop's `configs/default.toml` and read by nothing else.

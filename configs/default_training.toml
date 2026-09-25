@@ -1,0 +1,50 @@
+# Every knob the TRAINING side reads, with the default the code itself uses.
+#
+# This file is separate from configs/default.toml on purpose. Nothing here is
+# read by a development run: the loop, the verifier and the scorers resolve
+# their settings from default.toml and never look at this file. It is loaded
+# only by `rsigame.data_pipeline` and `rsigame.training`, which is why a
+# machine that only runs the loop needs none of these paths to exist.
+#
+# Same three layers as default.toml, each overriding the one above:
+#   1. this file                             the defaults
+#   2. -c <name>.toml                        what one experiment changes
+#   3. environment variables                 a temporary override mid-run
+#
+# A COMMENTED-OUT KEY has no value to set here: the comment names what the
+# code falls back to instead. Uncomment and fill one in to pin it.
+#
+# Secrets are never in this file. They come from .env -- see .env.example.
+
+[corpus]
+# Building a training corpus from recorded sessions -- see
+# src/rsigame/data_pipeline. Only needed when you are rebuilding the corpus;
+# a development run reads none of this.
+# web_roots =                           # RSIGAME_CORPUS_WEB_ROOTS · comma-separated recording roots; no default
+# dataset_dir =                         # RSIGAME_CORPUS_DATASET_DIR · the downloaded corpus shards; no default
+# plan_teacher =                        # RSIGAME_CORPUS_PLAN_TEACHER · teacher model that distils Godot plans
+
+[sft]
+# One supervised fine-tuning run -- see src/rsigame/training. The values here
+# are the ones the released adapters were trained with; every one is also a
+# command-line flag on `rsigame.training sft`.
+# base_model =                          # RSIGAME_SFT_BASE_MODEL · the base to tune; no default
+# checkpoint_dir =                      # RSIGAME_SFT_CHECKPOINT_DIR · durable destination; unset means no syncing
+nproc = 4                               # RSIGAME_SFT_NPROC · cards per node; 4 is forced by the KV-head count
+sequence_parallel_size = 4              # RSIGAME_SFT_SEQUENCE_PARALLEL_SIZE · sp = gcd(kv_heads, world_size)
+max_length = 32768                      # RSIGAME_SFT_MAX_LENGTH · rows longer than this are dropped, not cut
+lora_rank = 16                          # RSIGAME_SFT_LORA_RANK
+lora_alpha = 32                         # RSIGAME_SFT_LORA_ALPHA
+lora_dropout = 0.05                     # RSIGAME_SFT_LORA_DROPOUT
+learning_rate = "1e-4"                  # RSIGAME_SFT_LEARNING_RATE
+weight_decay = 0.01                     # RSIGAME_SFT_WEIGHT_DECAY
+warmup_ratio = 0.03                     # RSIGAME_SFT_WARMUP_RATIO
+max_grad_norm = 1.0                     # RSIGAME_SFT_MAX_GRAD_NORM
+scheduler = "cosine"                    # RSIGAME_SFT_SCHEDULER
+save_steps = 25                         # RSIGAME_SFT_SAVE_STEPS
+save_limit = 6                          # RSIGAME_SFT_SAVE_LIMIT
+# 'default' supervises every assistant turn; 'last_round' only the final one,
+# which on per-decision rows left the loss with no trend at all.
+loss_scale = "default"                  # RSIGAME_SFT_LOSS_SCALE
+# How the tools column is rendered. It MUST match how the corpus was tokenised.
+agent_template = "hermes"               # RSIGAME_SFT_AGENT_TEMPLATE

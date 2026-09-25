@@ -41,6 +41,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f'unknown step {step!r}. One of: {", ".join(STEPS)}', file=sys.stderr)
         return 2
     from importlib import import_module
+    from .. import config
+    config.ensure_training()        # configs/default_training.toml -> the environment
     mod = import_module(f'.{STEPS[step]}', __package__)
     return int(mod.main(argv[1:]) or 0)
 

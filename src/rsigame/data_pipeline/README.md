@@ -63,8 +63,8 @@ which is the metric the system is judged on.
 
 ## Configuration
 
-Three keys, all under `[corpus]` in `configs/default.toml`, and all only needed
-when rebuilding a corpus:
+Three keys, all under `[corpus]` in `configs/default_training.toml` -- a file the
+development loop never reads -- and all only needed when rebuilding a corpus:
 
 | key | what it is |
 |---|---|
