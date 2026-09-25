@@ -91,9 +91,9 @@ high-level guidance, from a person or a stronger model, opens the next stage.
 
 ## What this repository is, and is not
 
-It is the RSIGame development loop: everything that happens once a playable
-game exists. It is not the baselines it is compared against, and not the
-generator that produces the game it starts from.
+It is the RSIGame development loop -- everything that happens once a playable
+game exists -- together with the pipeline that trains on what the loop
+produces. It is not the baselines it is compared against.
 
 - **Baselines.** The comparison arms of the paper (Play2Code, the round-robin
   direction policy, the multi-agent system of the appendix) are not here. The
@@ -103,6 +103,11 @@ generator that produces the game it starts from.
   P₀. Producing one is a separate pipeline; the frozen projects themselves
   are released, so a run can be reproduced from the same starting point
   without it.
+- **Training on the loop's own sessions.** `data_pipeline/` turns recorded
+  sessions into a supervised corpus and `training/` fine-tunes on it, which is
+  the step that makes the improvement recursive rather than per-run. Neither is
+  needed to run the loop: a development run reads none of their configuration,
+  and the trained adapters are released.
 
 ## Installation
 
@@ -199,6 +204,9 @@ src/rsigame/
   eval/              scoring, the proxy estimator, pairwise judging
   agent/             the exploration arm: sessions, probes, the repair agent
   review/            the human review tool used for outer guidance
+
+  data_pipeline/     recorded sessions -> a supervised fine-tuning corpus
+  training/          the corpus -> a LoRA adapter, merged for serving
 configs/             every knob, with its default and a comment
 scripts/             scoring and replay entry points
 patches/             the changes this work applies to GameCraft-Bench
@@ -210,6 +218,11 @@ Base games, run trees, recordings and scores are not in this repo. The scoring
 artefacts every number in the paper is read from are at
 [anonymous312874/rsigame-scoring-artifacts](https://huggingface.co/datasets/anonymous312874/rsigame-scoring-artifacts); the base games, run trees
 and recordings are released with the camera-ready.
+
+The supervised corpus and the adapters trained on it are released the same way:
+`data_pipeline/` documents how the corpus is built from recordings and
+`training/` how one arm is trained, so both can be rebuilt rather than taken on
+trust.
 
 ## Notes
 

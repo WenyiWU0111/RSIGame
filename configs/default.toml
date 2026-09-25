@@ -177,3 +177,36 @@ asset_round_cap = 0                     # OPENGAME_ASSET_ROUND_CAP
 [review]
 # The human review tool used for outer guidance.
 review_url = "http://127.0.0.1:8932"    # RSIGAME_REVIEW_REVIEW_URL
+
+[corpus]
+# Building a training corpus from recorded sessions -- see
+# src/rsigame/data_pipeline. Only needed when you are rebuilding the corpus;
+# a development run reads none of this.
+# web_roots =                           # RSIGAME_CORPUS_WEB_ROOTS · comma-separated recording roots; no default
+# dataset_dir =                         # RSIGAME_CORPUS_DATASET_DIR · the downloaded corpus shards; no default
+# plan_teacher =                        # RSIGAME_CORPUS_PLAN_TEACHER · teacher model that distils Godot plans
+
+[sft]
+# One supervised fine-tuning run -- see src/rsigame/training. The values here
+# are the ones the released adapters were trained with; every one is also a
+# command-line flag on `rsigame.training sft`.
+# base_model =                          # RSIGAME_SFT_BASE_MODEL · the base to tune; no default
+# checkpoint_dir =                      # RSIGAME_SFT_CHECKPOINT_DIR · durable destination; unset means no syncing
+nproc = 4                               # RSIGAME_SFT_NPROC · cards per node; 4 is forced by the KV-head count
+sequence_parallel_size = 4              # RSIGAME_SFT_SEQUENCE_PARALLEL_SIZE · sp = gcd(kv_heads, world_size)
+max_length = 32768                      # RSIGAME_SFT_MAX_LENGTH · rows longer than this are dropped, not cut
+lora_rank = 16                          # RSIGAME_SFT_LORA_RANK
+lora_alpha = 32                         # RSIGAME_SFT_LORA_ALPHA
+lora_dropout = 0.05                     # RSIGAME_SFT_LORA_DROPOUT
+learning_rate = "1e-4"                  # RSIGAME_SFT_LEARNING_RATE
+weight_decay = 0.01                     # RSIGAME_SFT_WEIGHT_DECAY
+warmup_ratio = 0.03                     # RSIGAME_SFT_WARMUP_RATIO
+max_grad_norm = 1.0                     # RSIGAME_SFT_MAX_GRAD_NORM
+scheduler = "cosine"                    # RSIGAME_SFT_SCHEDULER
+save_steps = 25                         # RSIGAME_SFT_SAVE_STEPS
+save_limit = 6                          # RSIGAME_SFT_SAVE_LIMIT
+# 'default' supervises every assistant turn; 'last_round' only the final one,
+# which on per-decision rows left the loss with no trend at all.
+loss_scale = "default"                  # RSIGAME_SFT_LOSS_SCALE
+# How the tools column is rendered. It MUST match how the corpus was tokenised.
+agent_template = "hermes"               # RSIGAME_SFT_AGENT_TEMPLATE

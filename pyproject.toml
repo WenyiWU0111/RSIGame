@@ -32,7 +32,8 @@ rsigame = "rsigame.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-rsigame = ["_envmap.json", "review/static/*.html", "eval/pairwise/*.md"]
+rsigame = ["_envmap.json", "review/static/*.html", "eval/pairwise/*.md",
+           "training/launch.sh", "training/README.md", "data_pipeline/README.md"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
