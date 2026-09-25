@@ -1,0 +1,21 @@
+--- a/gamecraft_bench/verifier/judges/openai_gpt.py	2026-09-01 13:32:17.646575569 -0700
++++ b/gamecraft_bench/verifier/judges/openai_gpt.py	2026-09-14 02:41:46.650670684 -0700
+@@ -192,7 +192,17 @@
+         elif temp.strip() != "":
+             call_kwargs["temperature"] = float(temp)
+ 
+-        if _common.get_env("GAMECRAFT_BENCH_JUDGE_NO_THINK"):
++        # HOSTED (OpenRouter) COPY. A provider is pinned with no fallback, so
++        # every call of a run is served by the same backend, and thinking is
++        # turned off the way OpenRouter spells it; `chat_template_kwargs` is a
++        # vLLM serving argument a gateway ignores.
++        provider = _common.get_env("GAMECRAFT_BENCH_JUDGE_PROVIDER")
++        if provider:
++            call_kwargs["extra_body"] = {
++                "provider": {"order": [provider], "allow_fallbacks": False},
++                "reasoning": {"enabled": False},
++            }
++        elif _common.get_env("GAMECRAFT_BENCH_JUDGE_NO_THINK"):
+             call_kwargs["extra_body"] = {
+                 "chat_template_kwargs": {"enable_thinking": False}
+             }

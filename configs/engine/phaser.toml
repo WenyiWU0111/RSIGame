@@ -1,0 +1,13 @@
+# Phaser, through OpenGame -- same tasks, same rubric, only the engine changes.
+[engine]
+name = "phaser"
+build = "npm run build"
+build_gate = "tools/web_build_check.py"
+# A web build has no import step and no padded tail; what is judged is dist/.
+replay_pad_tail = false
+
+[replay]
+# A little slack around a web replay: the page has to start, and the last frame
+# has to land before the recording stops.
+web_before_s = 1.0
+web_after_s = 1.0

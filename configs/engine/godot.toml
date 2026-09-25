@@ -1,0 +1,11 @@
+# Godot 4 -- the benchmark's native engine.
+[paths]
+# bench_godot_bin = "/path/to/godot"   # required: used for both building and replay
+
+[engine]
+name = "godot"
+build = "godot --headless --import && godot --headless --export-release"
+build_gate = "godot --headless --import"
+# A Godot demo is padded at the tail, so the replay is not judged on a frozen
+# last frame and read as "nothing moved".
+replay_pad_tail = true

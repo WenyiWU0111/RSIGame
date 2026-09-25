@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Director Review</title>
+<style>
+  :root {
+    --ground: #f3f4f1; --panel: #ffffff; --ink: #1c2230; --muted: #5d6472; --line: #dfe2dc;
+    --accent: #0e6f68; --accent-soft: #e2f1ef; --warn: #9a5b12; --warn-soft: #f8eedf;
+    --bad: #a3261c; --bad-soft: #f9e6e3; --screen: #0b0d12;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--ground); color: var(--ink);
+         font: 15px/1.5 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; align-items: baseline; gap: 16px; padding: 14px 24px; background: var(--panel);
+           border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  header h1 { font-size: 17px; margin: 0; }
+  header .meta { color: var(--muted); font-size: 14px; }
+  header a { margin-left: auto; color: var(--accent); font-weight: 600; text-decoration: none; font-size: 14px; }
+  main { max-width: 1480px; margin: 0 auto; padding: 20px 24px 48px; display: grid; gap: 20px; }
+  .top { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; align-items: start; }
+  @media (max-width: 1100px) { .top { grid-template-columns: 1fr; } }
+
+  .viewport { position: relative; background: var(--screen); border-radius: 8px; overflow: hidden;
+              aspect-ratio: 16 / 9; outline: none; box-shadow: 0 0 0 1px var(--line); cursor: crosshair; }
+  .viewport img { width: 100%; height: 100%; display: block; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+  .viewport.active { box-shadow: 0 0 0 3px var(--accent); }
+  .veil { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(11,13,18,0.55);
+          color: #fff; text-align: center; padding: 24px; font-size: 16px; }
+  .veil small { display: block; opacity: 0.8; margin-top: 6px; font-size: 13px; }
+  .viewport.active .veil.focus { display: none; }
+  .hint { color: var(--muted); font-size: 13px; margin: 8px 2px 0; }
+
+  aside { display: grid; gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; }
+  .card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  .meter { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; margin-bottom: 12px; }
+  .meter .v { font-variant-numeric: tabular-nums; font-weight: 600; }
+  .bar { grid-column: 1 / -1; height: 6px; background: #eceee9; border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
+  .bar.low i { background: var(--warn); } .bar.out i { background: var(--bad); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .status { font-size: 13px; color: var(--muted); }
+  .status.bad { color: var(--bad); }
+  button { font: inherit; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel);
+           color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button:focus-visible, textarea:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .scroll { max-height: 300px; overflow: auto; font-size: 14px; }
+  .spec h3 { font-size: 14px; margin: 12px 0 4px; }
+  .spec p { margin: 0 0 8px; }
+  pre.summary { margin: 0; white-space: pre-wrap; font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace; }
+
+  form.brief { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; display: grid; gap: 16px; }
+  form.brief h2 { font-size: 16px; margin: 0; }
+  .field { display: grid; gap: 6px; }
+  .field label { font-weight: 600; font-size: 14px; }
+  .field .help { color: var(--muted); font-size: 13px; margin-top: -4px; }
+  textarea, input[type=text] { font: inherit; width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 6px; background: #fcfcfb; color: var(--ink); }
+  textarea { min-height: 64px; resize: vertical; }
+  .list { display: grid; gap: 6px; }
+  .list div { display: grid; grid-template-columns: 22px 1fr; align-items: center; }
+  .list span { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+  .actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; flex-wrap: wrap; }
+  .saved { color: var(--muted); font-size: 13px; margin-right: auto; }
+  .errors { color: var(--bad); background: var(--bad-soft); border-radius: 6px; padding: 8px 12px; font-size: 14px; }
+  .done { background: var(--accent-soft); color: var(--accent); border-radius: 6px; padding: 10px 14px; font-weight: 600; }
+  @media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Director Review</h1>
+  <span class="meta" id="meta"></span>
+  <a id="back" href="/">All cases</a>
+</header>
+<main>
+  <div class="top">
+    <section>
+      <div class="viewport" id="vp" tabindex="0" aria-label="Game. Click to give it the keyboard.">
+        <img id="screen" alt="Live game display">
+        <div class="veil focus" id="veil">Click the game to play<small>Keys go to the game while this frame is outlined. The focusing click itself is not sent.</small></div>
+        <div class="veil" id="crash" hidden>The game process stopped.<small><button id="relaunch" type="button">Relaunch (does not use a reset)</button></small></div>
+      </div>
+      <p class="hint">Each key press (however long you hold it) and each click uses 1 action. Watching and waiting are free.</p>
+    </section>
+    <aside>
+      <div class="card">
+        <h2>Budget</h2>
+        <div class="meter"><span>Actions</span><span class="v" id="actv">0 / 60</span><div class="bar" id="actbar"><i></i></div></div>
+        <div class="meter"><span>Resets</span><span class="v" id="resv">0 / 2</span><div class="bar" id="resbar"><i></i></div></div>
+        <div class="row"><button id="reset" type="button">Reset game</button><span class="status" id="gstat">Starting the game…</span></div>
+      </div>
+      <div class="card"><h2>Game specification</h2><div class="scroll spec" id="spec"></div></div>
+      <div class="card"><h2>Development so far</h2><div class="scroll"><pre class="summary" id="summary"></pre></div></div>
+    </aside>
+  </div>
+
+  <form class="brief" id="brief" novalidate>
+    <h2>Development Brief</h2>
+    <div class="field">
+      <label for="stage_objective">Stage objective</label>
+      <div class="help">One high-level objective for the next development stage.</div>
+      <textarea id="stage_objective" rows="2"></textarea>
+    </div>
+    <div class="field">
+      <label for="why_now">Why now</label>
+      <div class="help">Why this is the highest-leverage next stage, based on what you saw while playing.</div>
+      <textarea id="why_now" rows="3"></textarea>
+    </div>
+    <div class="cols">
+      <div class="field">
+        <label for="p1">Priorities</label>
+        <div class="help">One to three. Directions, not code-level fixes.</div>
+        <div class="list">
+          <div><span>1</span><input type="text" id="p1"></div>
+          <div><span>2</span><input type="text" id="p2"></div>
+          <div><span>3</span><input type="text" id="p3"></div>
+        </div>
+      </div>
+      <div class="field">
+        <label for="k1">Preserve</label>
+        <div class="help">Optional. What already works and must not be broken.</div>
+        <div class="list">
+          <div><span>1</span><input type="text" id="k1"></div>
+          <div><span>2</span><input type="text" id="k2"></div>
+          <div><span>3</span><input type="text" id="k3"></div>
+        </div>
+      </div>
+    </div>
+    <div id="errors" class="errors" hidden></div>
+    <div class="actions">
+      <span class="saved" id="saved">Draft saves automatically.</span>
+      <button type="button" id="savebtn">Save draft</button>
+      <button type="submit" class="primary" id="submit">Submit review</button>
+    </div>
+  </form>
+</main>
+<script>
+const $ = s => document.querySelector(s);
+const cid = location.pathname.split('/').pop();
+const rid = new URLSearchParams(location.search).get('reviewer') || (() => { try { return localStorage.getItem('reviewer_id'); } catch (e) { return ''; } })();
+$('#back').href = '/?reviewer=' + encodeURIComponent(rid || '');
+let sid = null, locked = false, held = new Set(), lastMove = 0;
+const W = 1280, H = 720;
+
+function esc(s) { return s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+function renderSpec(md) {
+  return md.split('\n\n').map(b => b.startsWith('## ') ? `<h3>${esc(b.slice(3).split('\n')[0])}</h3><p>${esc(b.split('\n').slice(1).join(' '))}</p>`
+    : b.startsWith('# ') ? '' : `<p>${esc(b.replace(/\n/g, ' '))}</p>`).join('');
+}
+function show(st) {
+  if (!st || st.actions_used === undefined) return;
+  $('#actv').textContent = `${st.actions_used} / ${st.actions_max}`;
+  $('#resv').textContent = `${st.resets_used} / ${st.resets_max}`;
+  const left = st.actions_max - st.actions_used;
+  const ab = $('#actbar'); ab.querySelector('i').style.width = (100 * st.actions_used / st.actions_max) + '%';
+  ab.className = 'bar' + (left <= 0 ? ' out' : left <= 10 ? ' low' : '');
+  $('#resbar').querySelector('i').style.width = (100 * st.resets_used / st.resets_max) + '%';
+  $('#reset').disabled = locked || st.resets_used >= st.resets_max || !st.game_alive;
+  $('#crash').hidden = locked || st.game_alive;
+  const g = $('#gstat');
+  g.className = 'status' + (st.game_alive ? '' : ' bad');
+  g.textContent = locked ? 'Review submitted.' : !st.game_alive ? 'Game not running.' : left <= 0 ? 'Action budget spent: you can still watch.' : 'Game running.';
+}
+async function api(path, method = 'GET', body) {
+  const r = await fetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+  return r.json().then(j => (j.status_code = r.status, j));
+}
+function fields() {
+  const v = id => $('#' + id).value;
+  return { stage_objective: v('stage_objective'), why_now: v('why_now'),
+           priorities: ['p1', 'p2', 'p3'].map(v), preserve: ['k1', 'k2', 'k3'].map(v) };
+}
+function fill(f) {
+  if (!f) return;
+  $('#stage_objective').value = f.stage_objective || ''; $('#why_now').value = f.why_now || '';
+  (f.priorities || []).forEach((x, i) => { if (i < 3) $('#p' + (i + 1)).value = x; });
+  (f.preserve || []).forEach((x, i) => { if (i < 3) $('#k' + (i + 1)).value = x; });
+}
+function lock() {
+  locked = true;
+  document.querySelectorAll('#brief textarea, #brief input, #brief button').forEach(e => e.disabled = true);
+  $('#errors').hidden = true;
+  $('#saved').outerHTML = '<span class="done" id="saved">Submitted. Thank you — this brief is saved.</span>';
+  $('#veil').innerHTML = 'Review submitted'; $('#vp').classList.remove('active'); $('#vp').blur();
+}
+
+async function open() {
+  if (!rid) { location.href = '/'; return; }
+  const r = await api('/api/session/open', 'POST', { case_id: cid, reviewer_id: rid });
+  if (r.status_code !== 200) { $('#gstat').textContent = r.detail || 'Could not open the session.'; return; }
+  sid = r.session_id;
+  $('#title').textContent = r.case.title;
+  $('#meta').textContent = `${r.case.case_id} · build ${r.case.checkpoint_id} · reviewer ${rid}`;
+  $('#spec').innerHTML = renderSpec(r.case.spec);
+  $('#summary').textContent = r.case.saturation_summary;
+  document.title = `${r.case.title} · Director Review`;
+  if (r.submitted) { lock(); show({ actions_used: 0, actions_max: r.case.budget.actions, resets_used: 0, resets_max: r.case.budget.resets, game_alive: false }); return; }
+  fill((r.draft || {}).fields);
+  show(r.state);
+  $('#screen').src = '/stream/' + sid;
+  setInterval(async () => { if (!locked) show(await api(`/api/session/${sid}/state`)); }, 1500);
+}
+
+// ---- input
+const vp = $('#vp');
+vp.addEventListener('focus', () => vp.classList.add('active'));
+vp.addEventListener('blur', () => {
+  vp.classList.remove('active');
+  for (const code of held) send({ type: 'keyup', code });   // never leave a key held
+  held.clear();
+});
+function send(e) { if (sid && !locked) return api(`/api/session/${sid}/input`, 'POST', { ...e, client_t: Date.now() / 1000 }).then(show); }
+function toGame(ev) {
+  const r = $('#screen').getBoundingClientRect();
+  const s = Math.min(r.width / W, r.height / H), ox = (r.width - W * s) / 2, oy = (r.height - H * s) / 2;
+  return { x: Math.round((ev.clientX - r.left - ox) / s), y: Math.round((ev.clientY - r.top - oy) / s) };
+}
+vp.addEventListener('mousedown', ev => {
+  if (locked) return;
+  if (document.activeElement !== vp) { ev.preventDefault(); vp.focus(); return; }   // focusing click is not an action
+  ev.preventDefault();
+  const p = toGame(ev);
+  if (p.x < 0 || p.y < 0 || p.x >= W || p.y >= H) return;
+  send({ type: 'click', ...p, button: ['left', 'middle', 'right'][ev.button] || 'left' });
+});
+vp.addEventListener('contextmenu', ev => ev.preventDefault());
+vp.addEventListener('mousemove', ev => {
+  if (document.activeElement !== vp || locked) return;
+  const t = performance.now(); if (t - lastMove < 100) return; lastMove = t;
+  const p = toGame(ev); if (p.x >= 0 && p.y >= 0 && p.x < W && p.y < H) send({ type: 'move', ...p });
+});
+vp.addEventListener('keydown', ev => {
+  if (locked) return;
+  ev.preventDefault();
+  if (ev.repeat || held.has(ev.code)) return;
+  held.add(ev.code); send({ type: 'keydown', code: ev.code });
+});
+vp.addEventListener('keyup', ev => {
+  if (locked) return;
+  ev.preventDefault();
+  if (!held.has(ev.code)) return;
+  held.delete(ev.code); send({ type: 'keyup', code: ev.code });
+});
+$('#reset').addEventListener('click', async () => {
+  if (!confirm('Reset restarts the game from the beginning and uses 1 of your resets. Continue?')) return;
+  $('#gstat').textContent = 'Restarting…'; show(await api(`/api/session/${sid}/reset`, 'POST')); vp.focus();
+});
+$('#relaunch').addEventListener('click', async () => { show(await api(`/api/session/${sid}/relaunch`, 'POST')); });
+
+// ---- draft autosave and submit
+let timer = null;
+async function saveDraft() {
+  if (!sid || locked) return;
+  const d = await api(`/api/session/${sid}/draft`, 'PUT', { fields: fields() });
+  if (d.last_edit) $('#saved').textContent = 'Draft saved ' + d.last_edit.slice(11);
+}
+$('#brief').addEventListener('input', () => { $('#saved').textContent = 'Saving…'; clearTimeout(timer); timer = setTimeout(saveDraft, 1000); });
+$('#savebtn').addEventListener('click', saveDraft);
+$('#brief').addEventListener('submit', async ev => {
+  ev.preventDefault();
+  const f = fields(), errs = [];
+  if (!f.stage_objective.trim()) errs.push('Stage objective is required.');
+  if (!f.why_now.trim()) errs.push('Why now is required.');
+  if (!f.priorities.some(x => x.trim())) errs.push('Add at least one priority.');
+  if (errs.length) { $('#errors').hidden = false; $('#errors').textContent = errs.join(' '); return; }
+  if (!confirm('Submit this brief? You will not be able to change it or play further.')) return;
+  const r = await api(`/api/session/${sid}/submit`, 'POST', { fields: f });
+  if (r.ok) lock(); else { $('#errors').hidden = false; $('#errors').textContent = (r.errors || [r.detail]).join(' '); }
+});
+open();
+</script>
+</body>
+</html>

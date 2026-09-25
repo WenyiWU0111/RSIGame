@@ -1,0 +1,669 @@
+diff --git a/gamecraft_bench/config.py b/gamecraft_bench/config.py
+index 2bc611a..3948e76 100644
+--- a/gamecraft_bench/config.py
++++ b/gamecraft_bench/config.py
+@@ -181,6 +181,9 @@ def env_for_subprocess() -> dict[str, str]:
+     # Use GAMECRAFT_BENCH_JUDGE_* when the judge needs a different key/url
+     # than the agent.
+     for var in (
++        # Proxy-imposed request-body cap (see judges/openai_gpt.py).
++        "GAMECRAFT_BENCH_JUDGE_MAX_FRAMES",
++        "GAMECRAFT_BENCH_JUDGE_MAX_BODY_MB",
+         "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL",
+         "OPENAI_API_KEY", "OPENAI_BASE_URL", "OPENAI_EXTRA_HEADERS_JSON",
+         "KIMI_API_KEY", "KIMI_BASE_URL",
+diff --git a/gamecraft_bench/local_agents.py b/gamecraft_bench/local_agents.py
+index b0809b3..ef2ed46 100644
+--- a/gamecraft_bench/local_agents.py
++++ b/gamecraft_bench/local_agents.py
+@@ -28,6 +28,7 @@ from __future__ import annotations
+ import asyncio
+ import json
+ import os
++import re
+ import shlex
+ 
+ from harbor.agents.installed.base import (
+@@ -283,8 +284,21 @@ class LocalCodex(Codex):
+     """Codex that trusts a pre-installed ``codex`` CLI on PATH and retries
+     the agent invocation on upstream 5xx errors."""
+ 
+-    MAX_RETRIES = 3
+-    RETRY_BACKOFF_SEC = 60
++    # Two different budgets, because two different things go wrong. A 5xx is
++    # the provider failing and deserves a few tries. Being SIGKILLed is nothing
++    # to do with this run at all -- on 2026-08-28 all twelve agents of a round
++    # were killed twice within the first 40 minutes -- and spending the same
++    # small budget on it means a healthy trial dies for someone else's cleanup.
++    MAX_RETRIES = 4              # upstream 5xx
++    # 2026-08-29: the killer stopped being occasional. Three independent
++    # sweeps took ~58 SIGTERMs each in forty minutes and every trial was
++    # at 5/8 with hours of work still to do. A budget sized for a stray
++    # cleanup script is not sized for a standing one, and running out
++    # discards a trial that was never unhealthy.
++    MAX_SIGNAL_RESUMES = 24      # killed from outside; resumes, does not restart
++    MAX_RESUME_FALLBACKS = 2     # resume had no session; restart from scratch
++    RETRY_BACKOFF_SEC = 30       # doubles per attempt, capped below
++    MAX_BACKOFF_SEC = 300
+ 
+     @staticmethod
+     def name() -> str:
+@@ -304,37 +318,108 @@ class LocalCodex(Codex):
+         self, instruction: str, environment: BaseEnvironment, context: AgentContext
+     ) -> None:
+         last_exc: NonZeroAgentExitCodeError | None = None
+-        for attempt in range(self.MAX_RETRIES):
++        api_tries = 0            # attempts spent on upstream 5xx
++        signal_tries = 0         # attempts spent being killed from outside
++        resume_fallbacks = 0     # attempts spent on a resume with nothing to resume
++        attempt = 0
++        while True:
+             if attempt > 0:
++                # Exponential, capped: a provider having a bad minute should not
++                # be hammered, and a killer that fires every few minutes should
++                # not be raced.
++                backoff = min(self.RETRY_BACKOFF_SEC * 2 ** (attempt - 1),
++                              self.MAX_BACKOFF_SEC)
+                 self.logger.info(
+-                    "Retrying codex (attempt %d/%d) after backoff %ds",
+-                    attempt + 1,
+-                    self.MAX_RETRIES,
+-                    self.RETRY_BACKOFF_SEC,
++                    "Retrying codex (5xx %d/%d, signal %d/%d) after backoff %ds",
++                    api_tries, self.MAX_RETRIES,
++                    signal_tries, self.MAX_SIGNAL_RESUMES, backoff,
+                 )
+-                await asyncio.sleep(self.RETRY_BACKOFF_SEC)
++                await asyncio.sleep(backoff)
++            attempt += 1
+             try:
+                 await Codex.run(self, instruction, environment, context)
+                 return
+             except NonZeroAgentExitCodeError as exc:
+                 last_exc = exc
++
++                # A negative exit code means a signal, not a failure the agent
++                # chose. On 2026-08-28 two full batches of 12 trials each were
++                # SIGTERMed within 250 ms, mid-request, with the API returning
++                # 200s one second earlier: this box runs several other agent
++                # sessions, and a `pkill -f codex` from any of them matches
++                # every one of these processes at once. $47 of generation was
++                # lost because the old code only retried on a 5xx in the log,
++                # and a killed run leaves no 5xx.
++                #
++                # Retry with resume, not from scratch. codex has already
++                # written its rollout, so `codex exec resume --last` picks the
++                # conversation up instead of paying for the same tokens twice.
++                signal_num = self._exit_signal(exc)
++                if signal_num is not None:
++                    signal_tries += 1
++                    self.logger.warning(
++                        "codex was killed by signal %d (not its own failure); "
++                        "resuming (%d/%d)",
++                        signal_num, signal_tries, self.MAX_SIGNAL_RESUMES,
++                    )
++                    if signal_tries >= self.MAX_SIGNAL_RESUMES:
++                        self.logger.warning(
++                            "killed %d times from outside; giving this task up",
++                            signal_tries,
++                        )
++                        raise
++                    self._resume = True
++                    continue
++
++                # A resume that cannot resume. `codex exec resume --last`
++                # exits 1 when there is no session to pick up -- harbor's
++                # setup guard says so in as many words ("Cannot resume Codex:
++                # no previous session logs found") -- which happens whenever
++                # the killer lands before codex has written its first rollout.
++                # Raising here throws away a trial for the sake of the few
++                # seconds of work we were trying to preserve. Start over
++                # instead; that is what the next round would do anyway, and
++                # this way it costs a slot rather than a whole round.
++                if self._resume and resume_fallbacks < self.MAX_RESUME_FALLBACKS:
++                    resume_fallbacks += 1
++                    self.logger.warning(
++                        "resume failed (%d/%d); starting this task from scratch",
++                        resume_fallbacks, self.MAX_RESUME_FALLBACKS,
++                    )
++                    self._resume = False
++                    continue
++
+                 log_path = EnvironmentPaths.agent_dir / "codex.txt"
+                 if not await self._codex_log_has_5xx(environment, log_path.as_posix()):
+                     raise
+-                if attempt == self.MAX_RETRIES - 1:
++                api_tries += 1
++                if api_tries >= self.MAX_RETRIES:
+                     self.logger.warning(
+                         "codex failed with upstream 5xx after %d attempts; giving up",
+-                        self.MAX_RETRIES,
++                        api_tries,
+                     )
+                     raise
+ 
++    # "Command failed (exit -15): ..." -- subprocess reports a signal death as
++    # the negated signal number.
++    _EXIT_SIGNAL_RE = re.compile(r"Command failed \(exit -(\d+)\)")
++
++    @classmethod
++    def _exit_signal(cls, exc: BaseException) -> int | None:
++        m = cls._EXIT_SIGNAL_RE.search(str(exc))
++        return int(m.group(1)) if m else None
++
+     @staticmethod
+     async def _codex_log_has_5xx(
+         environment: BaseEnvironment, log_path: str
+     ) -> bool:
+         result = await environment.exec(
+             command=(
+-                f"grep -iE '5[0-9]{{2}}|server.error|internal.error' "
++                # Anchored to how an HTTP failure is actually written. The old
++                # pattern was a bare 5[0-9]{2}, which matched "tokens: 512" and
++                # "width=1520" and reported a server error on every healthy run.
++                f"grep -iE '(status|code|error)[^0-9]{{0,12}}5[0-9]{{2}}|"
++                f"HTTP/[0-9.]+ 5[0-9]{{2}}|server.error|internal.server.error' "
+                 f"{shlex.quote(log_path)} | tail -1 || true"
+             ),
+         )
+diff --git a/gamecraft_bench/local_env.py b/gamecraft_bench/local_env.py
+index 48c5537..91a64d1 100644
+--- a/gamecraft_bench/local_env.py
++++ b/gamecraft_bench/local_env.py
+@@ -151,6 +151,17 @@ class LocalSubprocessEnvironment(BaseEnvironment):
+             if p == prefix or p.startswith(prefix + "/"):
+                 root = self._host_path_for_prefix(prefix)
+                 return root / p[len(prefix):].lstrip("/")
++        # /tmp is bind-mounted to the per-trial runtime dir (see
++        # _build_ns_command), so an upload addressed to /tmp has to land
++        # there too. Routing it to _root/tmp instead makes the file
++        # invisible to the sandboxed process: the bind shadows it.
++        # Harbor's Codex agent depends on this path -- it uploads its
++        # effective config.toml to $CODEX_HOME=/tmp/codex-home, and when
++        # that never arrives codex silently falls back to the default
++        # openai provider and hits api.openai.com instead of the
++        # configured base_url.
++        if p == "/tmp" or p.startswith("/tmp/"):
++            return self._runtime_tmp / p[len("/tmp"):].lstrip("/")
+         # Fallback: stash unknown absolute paths under sandbox/_root/...
+         return self._sandbox / "_root" / p.lstrip("/")
+ 
+@@ -261,6 +272,44 @@ class LocalSubprocessEnvironment(BaseEnvironment):
+         except asyncio.CancelledError:
+             return
+ 
++
++    @staticmethod
++    def _ppid_map() -> dict[int, int]:
++        """pid -> ppid for every process, in one pass."""
++        out = {}
++        try:
++            r = subprocess.run(["ps", "-eo", "pid,ppid", "--no-headers"],
++                               capture_output=True, text=True, timeout=5)
++        except Exception:  # noqa: BLE001
++            return out
++        for ln in (r.stdout or "").splitlines():
++            f = ln.split()
++            if len(f) == 2:
++                try:
++                    out[int(f[0])] = int(f[1])
++                except ValueError:
++                    continue
++        return out
++
++    def _is_ours(self, pid: int, ppids: dict[int, int]) -> bool:
++        """True when pid descends from a process this environment started.
++
++        Walks up rather than trusting the name: our godot runs are launched by
++        the agent inside our own exec, so they are always below one of the pids
++        we are tracking, and nobody else's are.
++        """
++        mine = set(self._active_exec_pids) | {os.getpid()}
++        seen = set()
++        cur = pid
++        while cur and cur not in seen:
++            if cur in mine:
++                return True
++            seen.add(cur)
++            cur = ppids.get(cur, 0)
++            if cur <= 1:
++                break
++        return False
++
+     def _kill_stuck_godot_once(self) -> None:
+         try:
+             proc = subprocess.run(
+@@ -270,6 +319,7 @@ class LocalSubprocessEnvironment(BaseEnvironment):
+         except Exception as exc:  # noqa: BLE001
+             self.logger.debug("watchdog ps failed: %s", exc)
+             return
++        ppids = self._ppid_map()
+         for line in (proc.stdout or "").splitlines():
+             parts = line.strip().split(None, 3)
+             if len(parts) < 4:
+@@ -283,6 +333,16 @@ class LocalSubprocessEnvironment(BaseEnvironment):
+                 continue
+             if etimes < self.STUCK_GODOT_KILL_SEC:
+                 continue
++            if not self._is_ours(pid, ppids):
++                # This box is shared. `ps -eo` lists everyone's processes, and
++                # "any godot older than five minutes" is a description of a
++                # neighbour's editor session as readily as of our own hung
++                # build check. Killing one of those is the exact thing that
++                # cost this project 24 trials when someone else's sweep did it
++                # to us. An orphan of ours whose parent already died is left
++                # alone here and cleaned up with the sandbox instead: missing
++                # one is recoverable, killing a stranger's is not.
++                continue
+             self.logger.warning(
+                 "watchdog killing stuck godot pid=%d etime=%ds args=%s",
+                 pid, etimes, args,
+@@ -450,8 +510,23 @@ class LocalSubprocessEnvironment(BaseEnvironment):
+         steps.append(f"eval {shlex.quote(inner_cmd)}")
+ 
+         bind_script = " && ".join(steps)
++        # --pid --fork --mount-proc: give every exec its own PID namespace.
++        # Without it the sandbox shares the host process table, and an agent
++        # habit as small as `pkill -f _fast.gd` reaches EVERYTHING the user
++        # owns whose argv matches. That is what serially killed rounds r1/r2
++        # of the casestudy sweep: the agent's cleanup pattern contained
++        # "godot", and so did the argv of harbor (--job-name casestudy-
++        # godot-...), the run script, every codex (the instruction text),
++        # and the log tail -- the proxy, with no "godot" in its argv, was
++        # the only survivor, which is how the pattern was identified (ftrace
++        # signal_generate caught comm=pkill in the act). Inside a PID ns the
++        # same pkill sees only this trial's own processes. Side benefit:
++        # when the namespace init (this bash) exits, the kernel reaps every
++        # process left inside, so stray godot test runs stop outliving
++        # their trial.
+         return [
+             "unshare", "--user", "--map-root-user", "--mount",
++            "--pid", "--fork", "--mount-proc",
+             "bash", "-c", bind_script,
+         ]
+ 
+diff --git a/gamecraft_bench/verifier/judges/openai_gpt.py b/gamecraft_bench/verifier/judges/openai_gpt.py
+index ccebf8d..59ab6b3 100644
+--- a/gamecraft_bench/verifier/judges/openai_gpt.py
++++ b/gamecraft_bench/verifier/judges/openai_gpt.py
+@@ -27,8 +27,17 @@ from pathlib import Path
+ from . import _common
+ from .base import JudgeError, JudgeRequest, JudgeResponse, MultimodalJudge
+ 
+-_MAX_FRAMES = 40
++# Upper bound on frames sent in one chat-completions request. The official
++# default is 40. Some OpenAI-compatible proxies cap the HTTP body well below
++# what 40 full-size PNG frames encode to (measured on one internal router:
++# 36 frames / ~4.18 MB -> 200, 38 frames / ~4.46 MB -> 413 body_too_large),
++# and a 413 makes the whole demo score 0 rather than degrading gracefully.
++# Override with GAMECRAFT_BENCH_JUDGE_MAX_FRAMES; the default is unchanged.
++_MAX_FRAMES = max(1, int(os.environ.get("GAMECRAFT_BENCH_JUDGE_MAX_FRAMES") or 40))
+ _MAX_TOKENS = 2048
++# Optional payload budget in MB for one judge request (0/unset = no budget,
++# i.e. official behaviour). See _select_frames for why bytes beat frame count.
++_MAX_BODY_BYTES = int(float(os.environ.get("GAMECRAFT_BENCH_JUDGE_MAX_BODY_MB") or 0) * 1_000_000)
+ 
+ 
+ def _parse_sse_to_text(raw: str) -> str:
+@@ -56,11 +65,33 @@ def _data_uri(path: Path) -> str:
+     return f"data:image/png;base64,{b64}"
+ 
+ 
+-def _select_frames(frames: list[Path]) -> list[Path]:
+-    if len(frames) <= _MAX_FRAMES:
++def _evenly_spaced(frames: list[Path], n: int) -> list[Path]:
++    if len(frames) <= n:
+         return list(frames)
+-    step = len(frames) / float(_MAX_FRAMES)
+-    return [frames[min(int(i * step), len(frames) - 1)] for i in range(_MAX_FRAMES)]
++    step = len(frames) / float(n)
++    return [frames[min(int(i * step), len(frames) - 1)] for i in range(n)]
++
++
++def _select_frames(frames: list[Path]) -> list[Path]:
++    """Evenly-spaced subset, capped by count and (optionally) by payload size.
++
++    The count cap alone is not safe on a proxy with an HTTP body limit,
++    because frame *bytes* vary with how much art is on screen. Measured on
++    one task: a shapes-only reference build averaged 61-88 KB per frame
++    while an agent build using real sprite assets averaged 109-156 KB --
++    so the same frame count is 3.4 MB for one and 6.0 MB for the other.
++    Capping on count therefore fails exactly on the richer-looking build,
++    which biases scoring against better art. Budget on bytes instead.
++    """
++    picked = _evenly_spaced(frames, _MAX_FRAMES)
++    if _MAX_BODY_BYTES <= 0:
++        return picked
++    # base64 inflates by 4/3; leave the remainder for prompt + JSON overhead.
++    def encoded(sel: list[Path]) -> int:
++        return int(sum(f.stat().st_size for f in sel) * 4 / 3)
++    while len(picked) > 1 and encoded(picked) > _MAX_BODY_BYTES:
++        picked = _evenly_spaced(picked, len(picked) - 1)
++    return picked
+ 
+ 
+ def _extra_headers() -> dict[str, str]:
+@@ -128,6 +159,43 @@ class OpenAIJudge(MultimodalJudge):
+             "text": _common.build_user_prompt(request.requirements),
+         })
+ 
++        # A reasoning model served locally by vLLM spends the whole token budget
++        # thinking and returns empty content: measured on a real 8-frame payload,
++        # 85s for 2000 output tokens and zero characters of answer, against 21s
++        # and a complete JSON object with thinking off. An empty body is not slow
++        # scoring, it is a parse failure the SDK then retries, which is where the
++        # six-minute judge calls came from. Off by default so the official
++        # GPT-5.5 runs are untouched; set for the local A/B judge.
++        call_kwargs: dict[str, object] = {}
++
++        # DETERMINISTIC BY DEFAULT, because a grader is not a writer.
++        #
++        # This call used to send no sampling parameters at all, so vLLM applied
++        # the model's own `generation_config.json` -- for Qwen3.8-27B that is
++        # `temperature: 1.0, top_p: 0.95, top_k: 20`, i.e. full sampling. The
++        # cost was measured before the cause was found: over three passes on one
++        # game, 8 of 65 requirement scores were identical, mean spread 0.258,
++        # and the three independent rewards were 0.762, 0.761 and 0.905. A whole
++        # scoring protocol was built around averaging that noise away.
++        #
++        # A hosted judge run through the same code was stable, which is what
++        # made the local one look like a model problem rather than a parameter
++        # one: OpenAI's default is 1.0 too, but a rubric graded by GPT-5.5
++        # happens to be far less sensitive to it than one graded by a 27B.
++        #
++        # `GAMECRAFT_BENCH_JUDGE_TEMPERATURE` overrides it for anyone who wants
++        # the spread back -- estimating judge noise needs it -- and an empty
++        # string sends no temperature at all, which restores the old behaviour.
++        temp = _common.get_env("GAMECRAFT_BENCH_JUDGE_TEMPERATURE")
++        if temp is None:
++            call_kwargs["temperature"] = 0.0
++        elif temp.strip() != "":
++            call_kwargs["temperature"] = float(temp)
++
++        if _common.get_env("GAMECRAFT_BENCH_JUDGE_NO_THINK"):
++            call_kwargs["extra_body"] = {
++                "chat_template_kwargs": {"enable_thinking": False}
++            }
+         try:
+             resp = client.chat.completions.create(
+                 model=self.model,
+@@ -136,6 +204,7 @@ class OpenAIJudge(MultimodalJudge):
+                     {"role": "system", "content": _common.SYSTEM_INSTRUCTION},
+                     {"role": "user", "content": content},
+                 ],
++                **call_kwargs,
+             )
+         except Exception as e:
+             raise JudgeError(f"OpenAI API call failed: {e}") from e
+diff --git a/gamecraft_bench/verifier/replay.py b/gamecraft_bench/verifier/replay.py
+index e62ed30..5f8d53f 100644
+--- a/gamecraft_bench/verifier/replay.py
++++ b/gamecraft_bench/verifier/replay.py
+@@ -70,6 +70,88 @@ class ReplayResult:
+     godot_returncode: int
+ 
+ 
++# --- readiness ---------------------------------------------------------
++
++# ON BY DEFAULT since 2026-09-11. It changes when every demo's inputs are
++# sent, and so it changes every score this harness produces: measured on
++# battle-critter-clash, a build that had not rendered when the script began
++# threw away its first four inputs, never entered battle, and was scored on a
++# recording of nothing. Numbers produced before this date are not comparable
++# with numbers produced after it. Set REPLAY_WAIT_FOR_DRAW=0 to reproduce the
++# old behaviour.
++WAIT_FOR_DRAW = os.environ.get("REPLAY_WAIT_FOR_DRAW", "1") not in ("", "0")
++DRAW_TIMEOUT = float(os.environ.get("REPLAY_DRAW_TIMEOUT") or 20.0)
++# Measured: a flat import screen reads std 0.3, a drawn title screen 34.
++DRAW_STD = float(os.environ.get("REPLAY_DRAW_STD") or 2.0)
++
++
++def _screen_stats(env: dict, display: str, size: tuple[int, int]):
++    """Mean and spread of one grabbed frame, in pure bytes.
++
++    Grabbed small and grey straight out of ffmpeg rather than through an
++    image library: this runs inside whichever interpreter the verifier was
++    started with, and PIL/numpy are not guaranteed there.
++    """
++    w, h = size
++    cp = subprocess.run(
++        ["ffmpeg", "-v", "error", "-f", "x11grab", "-video_size", f"{w}x{h}",
++         "-i", display, "-frames:v", "1", "-vf", "scale=64:36",
++         "-pix_fmt", "gray", "-f", "rawvideo", "-"],
++        env=env, capture_output=True, timeout=20)
++    b = cp.stdout
++    if not b:
++        return None, None
++    n = len(b)
++    mean = sum(b) / n
++    var = sum((x - mean) ** 2 for x in b) / n
++    return mean, var ** 0.5
++
++
++def _wait_for_first_draw(env: dict, display: str, size: tuple[int, int],
++                         timeout: float, log) -> float:
++    """Hold until the game has drawn something. Returns seconds waited.
++
++    WHY. `_find_godot_window` proves a window was MAPPED, which is not the
++    same as the game having rendered into it. Measured on
++    battle-critter-clash, rounds 4 to 13 took between 5.1 and 10.9 seconds to
++    put a first lit frame on screen while the window existed from the start --
++    deterministically, identically across three scoring passes, and not from
++    asset volume (the same game later carried four times the textures and drew
++    in 1.1s). The event clock started anyway, so the first four inputs of every
++    demo were posted into a window that had not rendered; the run never entered
++    battle and the judge scored what it saw. That is 0.45 of official score
++    lost to the harness rather than to the build.
++
++    THE TEST IS NON-UNIFORMITY, NOT BRIGHTNESS. A game may legitimately open
++    on black, so a brightness floor would hold a dark title screen back; worse,
++    it passes things that are not the game at all -- measured here, a tree
++    replayed without its `.godot/` cache shows a FLAT GREY 77 for all 904
++    frames while Godot imports, and `mean >= 5` waved that through at 0.13s.
++    Anything actually drawn -- text, a sprite, a gradient -- has spread; an
++    engine splash or an unpainted window does not.
++
++    It cannot catch a genuinely uniform first screen, which is why this is
++    bounded: on timeout the replay proceeds exactly as it did before, only
++    later, and says so in the log.
++    """
++    t0 = time.monotonic()
++    while time.monotonic() - t0 < timeout:
++        mean, std = _screen_stats(env, display, size)
++        if mean is not None and std >= DRAW_STD:
++            waited = time.monotonic() - t0
++            if hasattr(log, "write"):
++                log.write(f"first draw after {waited:.2f}s "
++                          f"(mean={mean:.1f} std={std:.1f})\n".encode())
++                log.flush()
++            return waited
++        time.sleep(0.25)
++    if hasattr(log, "write"):
++        log.write(f"no drawn frame within {timeout:.1f}s; "
++                  f"proceeding anyway\n".encode())
++        log.flush()
++    return time.monotonic() - t0
++
++
+ def replay_trace(
+     *,
+     project_dir: Path,
+@@ -200,6 +282,15 @@ def replay_trace(
+         # keydown/keyup/key events land in the Godot window.
+         _xdotool(env, "windowfocus", "--sync", window_id)
+ 
++        # 2b. Wait until the game has actually drawn, so that trace frame 0
++        #     means "the first frame the player could see" rather than "the
++        #     first frame after the window appeared". Recording starts after
++        #     this, which keeps every frame index downstream unchanged.
++        draw_wait = 0.0
++        if WAIT_FOR_DRAW:
++            draw_wait = _wait_for_first_draw(
++                env, display, (w, h), DRAW_TIMEOUT, godot_log)
++
+         # 3. ffmpeg x11grab. Start recording only after the game window exists
+         #    and is focused so trace frame 0 lines up with frame 0 of the
+         #    recorded gameplay rather than with a black Xvfb startup screen.
+diff --git a/gamecraft_bench/verifier/score.py b/gamecraft_bench/verifier/score.py
+index 6cec798..bed5325 100644
+--- a/gamecraft_bench/verifier/score.py
++++ b/gamecraft_bench/verifier/score.py
+@@ -29,9 +29,11 @@ lives in ``cli.py``.
+ from __future__ import annotations
+ 
+ import ast
++import concurrent.futures
+ import dataclasses
+ import json
+ import math
++import os
+ import operator
+ import random
+ import shutil
+@@ -45,6 +47,14 @@ from .replay import ReplayError, replay_trace
+ 
+ _JUDGE_MAX_ATTEMPTS = 5
+ 
++# A judge run at nonzero temperature does not return the same numbers twice, and
++# on a comparison between two arms that spread is indistinguishable from the
++# effect being measured. Setting GAMECRAFT_BENCH_JUDGE_REPEATS asks the judge the
++# same question N times and averages, per requirement; every pass is kept in
++# judge_log.json so the spread stays auditable rather than being smoothed away
++# silently. Default 1 leaves the official single-pass protocol untouched.
++_JUDGE_REPEATS = max(1, int(os.environ.get("GAMECRAFT_BENCH_JUDGE_REPEATS") or 1))
++
+ 
+ # ---------------------------------------------------------------------------
+ # Public API
+@@ -117,7 +127,8 @@ def score_project(
+     errors: list[str] = []
+ 
+     # 1. Build check.
+-    build_ok, build_log = _run_build_check(build_spec, output_dir)
++    build_ok, build_log = _run_build_check(build_spec, output_dir,
++                                           project_dir=project_dir)
+ 
+     # Default per-requirement = 0; populated by judge if BUILD passes.
+     # Per-requirement `agg` controls how the demo scores are folded into a
+@@ -203,26 +214,58 @@ def score_project(
+                 requirements=req_specs,
+             )
+             t0 = time.time()
+-            last_exc: JudgeError | None = None
+-            for attempt in range(_JUDGE_MAX_ATTEMPTS):
+-                if attempt:
+-                    time.sleep(5 * attempt)
+-                try:
+-                    resp = judge.score(req)
+-                    resp_scores = resp.scores
+-                    resp_rationales = resp.rationales
+-                    resp_raw = resp.raw
+-                    hard_failure = False
+-                    last_exc = None
+-                    break
+-                except JudgeError as e:
+-                    last_exc = e
+-            if last_exc is not None:
++
++            def _one_pass() -> tuple[dict, dict, str, JudgeError | None]:
++                last: JudgeError | None = None
++                for attempt in range(_JUDGE_MAX_ATTEMPTS):
++                    if attempt:
++                        time.sleep(5 * attempt)
++                    try:
++                        r = judge.score(req)
++                        return r.scores, r.rationales, r.raw, None
++                    except JudgeError as e:
++                        last = e
++                return {}, {}, "", last
++
++            # The passes are concurrent: they are independent questions about the
++            # same frames, and running them in series would multiply the wall
++            # time of every scoring job by the repeat count.
++            if _JUDGE_REPEATS == 1:
++                passes = [_one_pass()]
++            else:
++                with concurrent.futures.ThreadPoolExecutor(_JUDGE_REPEATS) as ex:
++                    passes = list(ex.map(lambda _: _one_pass(),
++                                         range(_JUDGE_REPEATS)))
++            good = [p for p in passes if p[3] is None]
++            if good:
++                resp_rationales = good[0][1]
++                resp_raw = good[0][2]
++                hard_failure = False
++                pass_scores = [p[0] for p in good]
++                resp_scores = {}
++                for rid in {k for d in pass_scores for k in d}:
++                    vals = []
++                    for d in pass_scores:
++                        try:
++                            vals.append(float(d[rid]))
++                        except (KeyError, TypeError, ValueError):
++                            pass
++                    if vals:
++                        resp_scores[rid] = sum(vals) / len(vals)
++            else:
+                 resp_scores = {}
+                 resp_rationales = {}
+                 resp_raw = ""
++                pass_scores = []
+                 hard_failure = True
+-                errors.append(f"judge failed on {art.demo_id}: {last_exc}")
++                errors.append(
++                    f"judge failed on {art.demo_id}: {passes[0][3]}"
++                )
++            if passes and len(good) < len(passes):
++                errors.append(
++                    f"judge: {len(passes) - len(good)}/{len(passes)} repeat(s) "
++                    f"failed on {art.demo_id}"
++                )
+             latency_s = time.time() - t0
+ 
+             for r in requirements:
+@@ -246,6 +289,8 @@ def score_project(
+                     "rationale": resp_rationales.get(rid, ""),
+                     "raw": resp_raw if rid == requirements[0]["id"] else "",
+                     "latency_seconds": round(latency_s, 3),
++                    "n_passes": len(pass_scores),
++                    "pass_scores": [d.get(rid) for d in pass_scores],
+                 })
+ 
+                 cur = req_scores[rid]
+@@ -317,9 +362,35 @@ def _aggregate(agg: str, per_demo: dict[str, float]) -> float:
+     return max(vals)
+ 
+ 
+-def _run_build_check(spec: dict, output_dir: Path) -> tuple[bool, str]:
+-    """Run the build smoke command in a shell. Captures combined output."""
++# The container path every rubric's build command is written against. The
++# official harness bind-mounts the project there; a local run has it somewhere
++# else entirely.
++_CONTAINER_PROJECT = "/workspace/game"
++
++
++def _run_build_check(spec: dict, output_dir: Path,
++                     project_dir: Path | None = None) -> tuple[bool, str]:
++    """Run the build smoke command in a shell. Captures combined output.
++
++    THE PATH IS ENVIRONMENT, NOT CRITERION. All 40 task rubrics hard-code
++    `godot --headless --path /workspace/game --quit-after 5`, which is correct
++    inside the harness container and wrong everywhere else. Run locally, godot
++    answers `Invalid project path specified: "/workspace/game", aborting.`,
++    `build_ok` comes back False, and since BUILD multiplies the whole formula
++    EVERY requirement scores 0 -- with nothing in the output naming the path as
++    the reason. Measured here on a project that builds fine on its own.
++
++    So the container path is substituted for the project actually being scored.
++    What the check MEANS is untouched: same binary, same flags, same timeout,
++    same "exit 0 and no fatal line" condition. The rubric files stay
++    byte-identical to the ones that produced the published baseline scores,
++    which is what keeps old and new numbers comparable -- editing 40 JSONs to
++    bake in a different absolute path would have traded one hard-code for
++    another and made that claim harder to defend.
++    """
+     cmd = spec["cmd"]
++    if project_dir is not None and _CONTAINER_PROJECT in cmd:
++        cmd = cmd.replace(_CONTAINER_PROJECT, str(Path(project_dir).resolve()))
+     timeout = float(spec.get("timeout_seconds", 60))
+     log_path = output_dir / "build.log"
+     try:

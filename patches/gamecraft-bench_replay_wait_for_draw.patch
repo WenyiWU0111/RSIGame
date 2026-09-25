@@ -1,0 +1,109 @@
+diff --git a/gamecraft_bench/verifier/replay.py b/gamecraft_bench/verifier/replay.py
+index e62ed30..5f8d53f 100644
+--- a/gamecraft_bench/verifier/replay.py
++++ b/gamecraft_bench/verifier/replay.py
+@@ -70,6 +70,88 @@ class ReplayResult:
+     godot_returncode: int
+ 
+ 
++# --- readiness ---------------------------------------------------------
++
++# ON BY DEFAULT since 2026-09-11. It changes when every demo's inputs are
++# sent, and so it changes every score this harness produces: measured on
++# battle-critter-clash, a build that had not rendered when the script began
++# threw away its first four inputs, never entered battle, and was scored on a
++# recording of nothing. Numbers produced before this date are not comparable
++# with numbers produced after it. Set REPLAY_WAIT_FOR_DRAW=0 to reproduce the
++# old behaviour.
++WAIT_FOR_DRAW = os.environ.get("REPLAY_WAIT_FOR_DRAW", "1") not in ("", "0")
++DRAW_TIMEOUT = float(os.environ.get("REPLAY_DRAW_TIMEOUT") or 20.0)
++# Measured: a flat import screen reads std 0.3, a drawn title screen 34.
++DRAW_STD = float(os.environ.get("REPLAY_DRAW_STD") or 2.0)
++
++
++def _screen_stats(env: dict, display: str, size: tuple[int, int]):
++    """Mean and spread of one grabbed frame, in pure bytes.
++
++    Grabbed small and grey straight out of ffmpeg rather than through an
++    image library: this runs inside whichever interpreter the verifier was
++    started with, and PIL/numpy are not guaranteed there.
++    """
++    w, h = size
++    cp = subprocess.run(
++        ["ffmpeg", "-v", "error", "-f", "x11grab", "-video_size", f"{w}x{h}",
++         "-i", display, "-frames:v", "1", "-vf", "scale=64:36",
++         "-pix_fmt", "gray", "-f", "rawvideo", "-"],
++        env=env, capture_output=True, timeout=20)
++    b = cp.stdout
++    if not b:
++        return None, None
++    n = len(b)
++    mean = sum(b) / n
++    var = sum((x - mean) ** 2 for x in b) / n
++    return mean, var ** 0.5
++
++
++def _wait_for_first_draw(env: dict, display: str, size: tuple[int, int],
++                         timeout: float, log) -> float:
++    """Hold until the game has drawn something. Returns seconds waited.
++
++    WHY. `_find_godot_window` proves a window was MAPPED, which is not the
++    same as the game having rendered into it. Measured on
++    battle-critter-clash, rounds 4 to 13 took between 5.1 and 10.9 seconds to
++    put a first lit frame on screen while the window existed from the start --
++    deterministically, identically across three scoring passes, and not from
++    asset volume (the same game later carried four times the textures and drew
++    in 1.1s). The event clock started anyway, so the first four inputs of every
++    demo were posted into a window that had not rendered; the run never entered
++    battle and the judge scored what it saw. That is 0.45 of official score
++    lost to the harness rather than to the build.
++
++    THE TEST IS NON-UNIFORMITY, NOT BRIGHTNESS. A game may legitimately open
++    on black, so a brightness floor would hold a dark title screen back; worse,
++    it passes things that are not the game at all -- measured here, a tree
++    replayed without its `.godot/` cache shows a FLAT GREY 77 for all 904
++    frames while Godot imports, and `mean >= 5` waved that through at 0.13s.
++    Anything actually drawn -- text, a sprite, a gradient -- has spread; an
++    engine splash or an unpainted window does not.
++
++    It cannot catch a genuinely uniform first screen, which is why this is
++    bounded: on timeout the replay proceeds exactly as it did before, only
++    later, and says so in the log.
++    """
++    t0 = time.monotonic()
++    while time.monotonic() - t0 < timeout:
++        mean, std = _screen_stats(env, display, size)
++        if mean is not None and std >= DRAW_STD:
++            waited = time.monotonic() - t0
++            if hasattr(log, "write"):
++                log.write(f"first draw after {waited:.2f}s "
++                          f"(mean={mean:.1f} std={std:.1f})\n".encode())
++                log.flush()
++            return waited
++        time.sleep(0.25)
++    if hasattr(log, "write"):
++        log.write(f"no drawn frame within {timeout:.1f}s; "
++                  f"proceeding anyway\n".encode())
++        log.flush()
++    return time.monotonic() - t0
++
++
+ def replay_trace(
+     *,
+     project_dir: Path,
+@@ -200,6 +282,15 @@ def replay_trace(
+         # keydown/keyup/key events land in the Godot window.
+         _xdotool(env, "windowfocus", "--sync", window_id)
+ 
++        # 2b. Wait until the game has actually drawn, so that trace frame 0
++        #     means "the first frame the player could see" rather than "the
++        #     first frame after the window appeared". Recording starts after
++        #     this, which keeps every frame index downstream unchanged.
++        draw_wait = 0.0
++        if WAIT_FOR_DRAW:
++            draw_wait = _wait_for_first_draw(
++                env, display, (w, h), DRAW_TIMEOUT, godot_log)
++
+         # 3. ffmpeg x11grab. Start recording only after the game window exists
+         #    and is focused so trace frame 0 lines up with frame 0 of the
+         #    recorded gameplay rather than with a black Xvfb startup screen.

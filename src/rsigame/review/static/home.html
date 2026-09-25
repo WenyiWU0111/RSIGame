@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Director Review</title>
+<style>
+  :root {
+    --ground: #f3f4f1; --panel: #ffffff; --ink: #1c2230; --muted: #5d6472; --line: #dfe2dc;
+    --accent: #0e6f68; --accent-soft: #e2f1ef; --warn: #9a5b12; --warn-soft: #f8eedf;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--ground); color: var(--ink);
+         font: 15px/1.5 "Inter", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 40px 20px; }
+  h1 { font-size: 22px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--muted); margin: 0 0 28px; }
+  .who { display: flex; gap: 8px; align-items: center; margin-bottom: 24px; flex-wrap: wrap; }
+  input { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); }
+  button { font: inherit; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--accent);
+           background: var(--accent); color: #fff; cursor: pointer; }
+  button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  td.num { font-variant-numeric: tabular-nums; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 13px; background: #eceee9; color: var(--muted); }
+  .pill.progress { background: var(--warn-soft); color: var(--warn); }
+  .pill.submitted { background: var(--accent-soft); color: var(--accent); }
+  a { color: var(--accent); font-weight: 600; text-decoration: none; }
+  .empty { color: var(--muted); padding: 20px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Director Review</h1>
+  <p class="sub">Play each game, then write the brief for its next development stage.</p>
+  <form class="who" id="who">
+    <label for="rid">Reviewer ID</label>
+    <input id="rid" autocomplete="off" placeholder="e.g. alex" required pattern="[A-Za-z0-9_.\-]{1,40}">
+    <button type="submit">Show my cases</button>
+  </form>
+  <div id="list" class="empty">Enter your reviewer ID to see your cases.</div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+let rid = new URLSearchParams(location.search).get('reviewer') || '';
+try { rid = rid || localStorage.getItem('reviewer_id') || ''; } catch (e) {}
+$('#rid').value = rid;
+
+async function load() {
+  if (!rid) return;
+  const r = await fetch('/api/cases?reviewer=' + encodeURIComponent(rid));
+  if (!r.ok) { $('#list').textContent = (await r.json()).detail; return; }
+  const rows = await r.json();
+  const cls = { 'not started': '', 'in progress': 'progress', 'submitted': 'submitted' };
+  $('#list').className = '';
+  $('#list').innerHTML = `<table><thead><tr><th>Case</th><th>Game</th><th>Build</th><th>Status</th><th>Actions</th><th></th></tr></thead><tbody>${
+    rows.map(c => `<tr><td>${c.case_id}</td><td>${c.title}</td><td>${c.checkpoint_id}</td>
+      <td><span class="pill ${cls[c.status]}">${c.status}</span></td>
+      <td class="num">${c.actions_used} / ${c.actions_max}</td>
+      <td><a href="/review/${c.case_id}?reviewer=${encodeURIComponent(rid)}">${c.status === 'submitted' ? 'View' : c.status === 'in progress' ? 'Resume' : 'Start'}</a></td></tr>`).join('')
+  }</tbody></table>`;
+}
+$('#who').addEventListener('submit', e => {
+  e.preventDefault(); rid = $('#rid').value.trim();
+  try { localStorage.setItem('reviewer_id', rid); } catch (e) {}
+  history.replaceState(null, '', '/?reviewer=' + encodeURIComponent(rid));
+  load();
+});
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rsigame"
+version = "0.1.0"
+description = "Controllable agentic game development with recursive self-improvement"
+readme = "README.md"
+requires-python = ">=3.11"          # tomllib
+license = { text = "Apache-2.0" }
+dependencies = [
+    "openai>=1.40",
+    "playwright>=1.44",             # web builds are replayed in a real browser
+    "python-dotenv>=1.0",
+    "pillow>=10.0",
+    "numpy>=1.26",
+]
+
+[project.optional-dependencies]
+# The benchmark is a separate repo with its own pyproject; install it in the
+# same environment (`pip install -e ../gamecraft-bench`) and the scorer imports
+# directly instead of going through a sys.path injection.
+bench = []
+review = ["fastapi>=0.110", "uvicorn>=0.29"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+rsigame = "rsigame.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+rsigame = ["_envmap.json", "review/static/*.html", "eval/pairwise/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# tests run without installing;for real use prefer `pip install -e .`
+pythonpath = ["src"]

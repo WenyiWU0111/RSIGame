@@ -1,0 +1,179 @@
+# Every knob RSIGame reads, with the default the code itself uses.
+#
+# Three layers, each overriding the one above:
+#   1. this file                          the defaults
+#   2. -c configs/experiment/<name>.toml  what one experiment changes
+#   3. environment variables              a temporary override mid-run
+#
+# A COMMENTED-OUT KEY has no value to set here: the comment names what the
+# code falls back to instead (often a path derived at runtime). Uncomment and
+# fill one in to pin it.
+#
+# Secrets are never in this file. They come from .env -- see .env.example.
+
+[paths]
+# Machine-local paths. Moving machines means editing only this section.
+# bench =                               # GAMECRAFT_BENCH · unset means off
+# bench_godot_bin =                     # GAMECRAFT_BENCH_GODOT_BIN · no default; falls back to shutil.which('godot')
+# bench_tasks =                         # GAMECRAFT_BENCH_TASKS · no default; falls back to str(paths.bench_tasks())
+# env =                                 # RSIGAME_PATHS_ENV · no default; falls back to Path.cwd() / '.env'
+# evidence_root =                       # RSIGAME_PATHS_EVIDENCE_ROOT · unset means off
+# python =                              # RSIGAME_PATHS_PYTHON · no default; falls back to sys.executable
+# run =                                 # RSIGAME_PATHS_RUN · no default; falls back to Path(__file__).resolve().parent
+# shared_mount =                        # RSIGAME_PATHS_SHARED_MOUNT · unset means off
+# target_trace_dir =                    # RSIGAME_PATHS_TARGET_TRACE_DIR · no default (unset)
+# trace_dump =                          # RSIGAME_PATHS_TRACE_DUMP · unset means off
+
+[models]
+# Which model plays which role.
+# chat_reasoning_cap =                  # RSIGAME_MODELS_CHAT_REASONING_CAP · no default (unset)
+# local_models =                        # RSIGAME_MODELS_LOCAL_MODELS · unset means off
+loop_model = "z-ai/glm-5.3-flash"       # RSIGAME_MODELS_LOOP_MODEL · what the paper ran
+play_model = "qwen/qwen3.8-27b"         # RSIGAME_MODELS_PLAY_MODEL · what the paper ran
+verifier_judge_model = "gpt-5.5"        # RSIGAME_MODELS_VERIFIER_JUDGE_MODEL
+
+[endpoints]
+# Where the models are served.
+openai_base_url = "https://openrouter.ai/api/v1"  # OPENAI_BASE_URL
+
+[loop]
+# One development round: budgets, rounds, timeouts.
+asset_repair = "0"                      # RSIGAME_LOOP_ASSET_REPAIR
+build_rollback = "0"                    # RSIGAME_LOOP_BUILD_ROLLBACK
+build_timeout_s = 600                   # RSIGAME_LOOP_BUILD_TIMEOUT_S
+checklist = "0"                         # RSIGAME_LOOP_CHECKLIST
+correctness_rounds = 4                  # RSIGAME_LOOP_CORRECTNESS_ROUNDS
+# env_file =                            # RSIGAME_LOOP_ENV_FILE · no default; falls back to RUN / '.env'
+explore_steps = 14                      # RSIGAME_LOOP_EXPLORE_STEPS
+history_rounds = "5"                    # RSIGAME_LOOP_HISTORY_ROUNDS
+judge_model = "qwen38-27b"              # RSIGAME_LOOP_JUDGE_MODEL
+# lean_repair =                         # RSIGAME_LOOP_LEAN_REPAIR · no default (unset)
+# loop =                                # RSIGAME_LOOP_LOOP · no default; falls back to Path(__file__).resolve().parents[2]
+max_frames = 12                         # RSIGAME_LOOP_MAX_FRAMES
+merged_verifier = "0"                   # RSIGAME_LOOP_MERGED_VERIFIER
+post_verify = "0"                       # RSIGAME_LOOP_POST_VERIFY
+post_verify_reasoning = 2048            # RSIGAME_LOOP_POST_VERIFY_REASONING
+project_map = "0"                       # RSIGAME_LOOP_PROJECT_MAP
+repair_budget_s = 1800                  # RSIGAME_LOOP_REPAIR_BUDGET_S · what the paper ran
+repair_tools = 26                       # RSIGAME_LOOP_REPAIR_TOOLS
+rounds = 8                              # RSIGAME_LOOP_ROUNDS
+# run_tag =                             # RSIGAME_LOOP_RUN_TAG · unset means off
+scenario_access = "0"                   # RSIGAME_LOOP_SCENARIO_ACCESS
+scenario_coverage = "0"                 # RSIGAME_LOOP_SCENARIO_COVERAGE
+scenario_history = "0"                  # RSIGAME_LOOP_SCENARIO_HISTORY
+schedule = "free"                       # RSIGAME_LOOP_SCHEDULE
+# score_dir =                           # RSIGAME_LOOP_SCORE_DIR · no default; falls back to Path(__file__).resolve().parents[2] / '_ckpt_s
+# score_out =                           # RSIGAME_LOOP_SCORE_OUT · no default; falls back to RUN / 'scoring'
+# score_scratch =                       # RSIGAME_LOOP_SCORE_SCRATCH · no default; falls back to str(paths.run_root() / 'score')
+spec_digest = "1"                       # RSIGAME_LOOP_SPEC_DIGEST
+stage_budget = "5,5"                    # RSIGAME_LOOP_STAGE_BUDGET
+static_evidence = "0"                   # RSIGAME_LOOP_STATIC_EVIDENCE
+
+[controller]
+# What a round works on, and how the repair is asked for.
+art_focus = "presentation"              # RSIGAME_CONTROLLER_ART_FOCUS
+art_rounds = 3                          # RSIGAME_CONTROLLER_ART_ROUNDS
+# art_tools =                           # RSIGAME_CONTROLLER_ART_TOOLS · no default; falls back to SR.REPAIR_TOOLS
+asset_cap = 20                          # RSIGAME_CONTROLLER_ASSET_CAP · what the paper ran
+# brief =                               # RSIGAME_CONTROLLER_BRIEF · unset means off
+dispatch = "fixed"                      # RSIGAME_CONTROLLER_DISPATCH
+# estimator =                           # RSIGAME_CONTROLLER_ESTIMATOR · unset means off
+keep_replay_every = 0                   # RSIGAME_CONTROLLER_KEEP_REPLAY_EVERY
+probe_steps = 8                         # RSIGAME_CONTROLLER_PROBE_STEPS · what the paper ran
+repair_attempts = 3                     # RSIGAME_CONTROLLER_REPAIR_ATTEMPTS
+snapshot = 1                            # RSIGAME_CONTROLLER_SNAPSHOT · what the paper ran
+# stop_file =                           # RSIGAME_CONTROLLER_STOP_FILE · no default (unset)
+
+[monitor]
+# The Global Quality Monitor: which build is the best one seen so far, and when
+# development has stopped paying.
+#
+# The champion is decided by replaying checkpoints -- during the run when
+# `live = true`, and afterwards by `scripts/vm_replay.py` either way.
+# `rsigame.monitor.value_stop` reads the stop from the champion trace.
+live = false                          # RSIGAME_MONITOR_LIVE · run the monitor during the run and let it stop it
+checkpoint_every = 3                  # RSIGAME_MONITOR_CHECKPOINT_EVERY · replay every Nth round
+passes = 1                            # RSIGAME_MONITOR_PASSES · judging passes per comparison
+champion_gain = 0.05                  # RSIGAME_MONITOR_CHAMPION_GAIN · margin a candidate must beat the champion by
+stop_after_k = 3                      # RSIGAME_MONITOR_STOP_AFTER_K · checkpoints with an unchanged champion before Value Stop fires
+# --- the proxy estimator the champion comparison reads ---
+base_url = "https://openrouter.ai/api/v1"  # RSIGAME_MONITOR_BASE_URL
+cov_min = 0.5                           # RSIGAME_MONITOR_COV_MIN
+# fail_dir =                            # RSIGAME_MONITOR_FAIL_DIR · no default; falls back to HERE / 'failures'
+# frame_cache =                         # RSIGAME_MONITOR_FRAME_CACHE · no default; falls back to HERE / 'frames_cache'
+gain = 0.05                             # RSIGAME_MONITOR_GAIN
+h_min = 0.2                             # RSIGAME_MONITOR_H_MIN
+jobs = 2                                # RSIGAME_MONITOR_JOBS
+# judge =                               # RSIGAME_MONITOR_JUDGE · no default (unset)
+max_demos = 3                           # RSIGAME_MONITOR_MAX_DEMOS
+model = "qwen/qwen3.8-flash"            # RSIGAME_MONITOR_MODEL
+n_frames = 16                           # RSIGAME_MONITOR_N_FRAMES
+provider = "alibaba"                    # RSIGAME_MONITOR_PROVIDER
+# r0_trees =                            # RSIGAME_MONITOR_R0_TREES · no default (unset)
+# runs =                                # RSIGAME_MONITOR_RUNS · no default; falls back to RUN / 'newloop_dispatch30' / 'runs'
+uri_budget = 22000000                   # RSIGAME_MONITOR_URI_BUDGET
+
+[repair]
+# The repair agent.
+agent_budget_s = 600                    # RSIGAME_REPAIR_AGENT_BUDGET_S
+finished_grace_s = 30                   # RSIGAME_REPAIR_FINISHED_GRACE_S
+model = "z-ai/glm-5.3-flash"            # RSIGAME_REPAIR_MODEL · what the paper ran
+# openai_base_url =                     # RSIGAME_REPAIR_OPENAI_BASE_URL · no default (unset)
+silent_start_s = 150                    # RSIGAME_REPAIR_SILENT_START_S
+
+[judge]
+# The judge model used for scoring.
+judge_base_url = "http://127.0.0.1:8038/v1"  # RSIGAME_JUDGE_JUDGE_BASE_URL
+judge_max_tokens = "2048"               # RSIGAME_JUDGE_JUDGE_MAX_TOKENS
+# judge_provider =                      # RSIGAME_JUDGE_JUDGE_PROVIDER · unset means off
+node_bin = "node"                       # RSIGAME_JUDGE_NODE_BIN
+quality_judge_base_url = "https://openrouter.ai/api/v1"  # RSIGAME_JUDGE_QUALITY_JUDGE_BASE_URL
+
+[generator]
+# Initial generation.
+base_url = "https://openrouter.ai/api/v1"  # RSIGAME_GENERATOR_BASE_URL
+model = "openai/gpt-5.5"                # RSIGAME_GENERATOR_MODEL
+
+[agent]
+# Switches and limits of the agent framework.
+# allow_any_model =                     # RSIGAME_AGENT_ALLOW_ANY_MODEL · no default (unset)
+# allowed_models =                      # RSIGAME_AGENT_ALLOWED_MODELS · no default (unset)
+binding_runtime = "0"                   # RSIGAME_AGENT_BINDING_RUNTIME
+# brief_cache =                         # RSIGAME_AGENT_BRIEF_CACHE · no default; falls back to str(paths.run_root() / '.brief_cache')
+# chat_temperature =                    # RSIGAME_AGENT_CHAT_TEMPERATURE · no default (unset)
+click_evidence = "0"                    # RSIGAME_AGENT_CLICK_EVIDENCE
+click_grounding = "0"                   # RSIGAME_AGENT_CLICK_GROUNDING
+evolution_mode = "0"                    # RSIGAME_AGENT_EVOLUTION_MODE
+# ground_model =                        # RSIGAME_AGENT_GROUND_MODEL · unset means off
+hold_during_frame = "0"                 # RSIGAME_AGENT_HOLD_DURING_FRAME
+inject_knowledge = "0"                  # RSIGAME_AGENT_INJECT_KNOWLEDGE
+# python =                              # RSIGAME_AGENT_PYTHON · no default; falls back to sys.executable
+repair_precedents = 3                   # RSIGAME_AGENT_REPAIR_PRECEDENTS
+# run =                                 # RSIGAME_AGENT_RUN · no default; falls back to str(paths.run_root())
+run_repair_loop = "0"                   # RSIGAME_AGENT_RUN_REPAIR_LOOP
+unverified_logging = "0"                # RSIGAME_AGENT_UNVERIFIED_LOGGING
+verify_n = 3                            # RSIGAME_AGENT_VERIFY_N
+
+[replay]
+# Replaying a build to record what it does.
+n_uniform = 16                          # RSIGAME_REPLAY_N_UNIFORM
+web_after_s = "0.35,1.0"                # RSIGAME_REPLAY_WEB_AFTER_S
+web_before_s = -0.25                    # RSIGAME_REPLAY_WEB_BEFORE_S
+
+[evidence]
+# Evidence collection.
+max_frames = 12                         # RSIGAME_EVIDENCE_MAX_FRAMES
+
+[art]
+# Art rounds.
+uri_budget = 22000000                   # RSIGAME_ART_URI_BUDGET
+
+[assets]
+# Asset generation.
+# asset_ledger =                        # OPENGAME_ASSET_LEDGER · unset means off
+asset_round_cap = 0                     # OPENGAME_ASSET_ROUND_CAP
+# expect_image_model =                  # RSIGAME_ASSETS_EXPECT_IMAGE_MODEL · unset means off
+
+[review]
+# The human review tool used for outer guidance.
+review_url = "http://127.0.0.1:8932"    # RSIGAME_REVIEW_REVIEW_URL

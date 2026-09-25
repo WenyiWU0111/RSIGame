@@ -1,0 +1,34 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+
+# secrets and machine-local config
+.env
+.env.*
+!.env.example
+
+# runs, scores and recordings never belong in the repo -- they are published
+# as datasets instead (see README)
+runs/
+scores/
+*.mp4
+# except the walkthrough the README shows: `*.mp4` is there to keep replay
+# recordings out, and those never live in assets/.
+!assets/*.mp4
+*.webp
+frames_*/
+
+# machine-local overlays
+configs/local/
+
+# Cached briefs a run writes next to the code
+.brief_cache/
+
+# Local-only scratch that must never be published: the leak scanner's term
+# list is the real names it searches for, so committing it would publish
+# exactly what it exists to keep out.
+*.local.txt
+*.local.*
