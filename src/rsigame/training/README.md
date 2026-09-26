@@ -21,7 +21,7 @@ python -m rsigame.training metrics --run /durable/s1s2s3 --out loss.csv
 
 LoRA (rank 16, alpha 32, rsLoRA) on every linear module of a 27B base, 4-bit
 NF4 resident weights with bf16 compute, batch size 1, one epoch, cosine
-schedule, 32,768-token context. Three arms — `s1` generation only, `s1s2`
+schedule, 57,344-token context, AdamW (fused), learning rate 5e-5. Three arms — `s1` generation only, `s1s2`
 + plan, `s1s2s3` + repair — sharing the same generation rows by construction.
 
 ## The settings that are not defaults
@@ -32,7 +32,7 @@ schedule, 32,768-token context. Three arms — `s1` generation only, `s1s2`
 | 4-bit NF4 base | drops resident weights ~49 → ~14 GiB per rank, which is what makes long agent sessions fit at all |
 | DeepSpeed off | with a 4-bit resident base there is nothing left to shard |
 | `dataset_shuffle = false` | the corpus is ordered deliberately — see `data_pipeline.mix` |
-| `truncation_strategy = delete` | a row that does not fit is dropped, never cut: half a tool-call batch is not a state the agent ever occupies |
+| `truncation_strategy = right` | what the released adapter used: a row longer than 57,344 tokens is cut from the right. `--truncation delete` drops such rows instead, so that no half tool-call batch is trained on |
 | `attn_impl = sdpa`, cuDNN backend off in-process | every run died in cuDNN's fused attention, and the documented environment switch is ignored by this torch build |
 
 ## The loss_scale finding
@@ -41,8 +41,10 @@ With per-decision rows, `--loss_scale last_round` supervises only the final
 assistant turn: a median of **114 tokens per step**. A run at that setting
 produced a loss with **no trend at all** — corr(loss, step) ≈ 0 over 350 steps,
 where whole-session runs reached −0.35. Supervising every assistant turn
-(`default`) together with a learning rate of 1e-4 restored it. `default` is the
-default here for that reason.
+(`default`) together with a learning rate of 1e-4 restored it. The released
+adapter was trained before this finding, with `default+ignore_empty_think`
+(every assistant turn, minus empty think blocks) at 5e-5; those are the
+defaults here, so a run with no flags reproduces it.
 
 `last_round` stays available because it is the right answer if the rows are
 rebuilt so that history is context rather than target — which is what

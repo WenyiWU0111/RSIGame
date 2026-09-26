@@ -34,11 +34,12 @@ evolution through high-level guidance.**
 
 ## Abstract
 
-> Recent advances in large language models have made automatic game generation increasingly feasible, yet reliably improving generated games beyond a playable version remains challenging. Naive iterative refinement can easily overfit a small set of test cases, producing fragile games with unresolved bugs, missing behaviors, and poor generalization to broader player interactions.
+>Recent advances in large language models have made automatic game generation increasingly feasible, yet reliably improving generated games beyond a playable version remains challenging. Naive iterative refinement can easily overfit a small set of test cases, producing fragile games with unresolved bugs, missing behaviors, and poor generalization to broader player interactions.
 >
-> We introduce **RSIGame**, an autonomous agentic game development framework with recursive self-improvement. RSIGame organizes development into complementary local and global loops. Concretely, a local *explore-diagnose-improve* loop broadly explores the executable game, diagnoses and prioritizes discovered issues, and performs evidence-grounded revision, where an evolving checklist continually accumulates new testing and improvement guidance. A global loop tracks overall quality, preserves the best checkpoint, and detects saturation or regression over long-horizon development. Beyond test-time improvement, RSIGame further internalizes successful development experience into the generator through training.
+>We introduce **RSIGame**, an autonomous agentic game development framework with recursive self-improvement. **RSIGame** organizes development into complementary local and global loops. Concretely, a local *explore-diagnose-improve* loop broadly explores the executable game, diagnoses and prioritizes discovered issues, and performs evidence-grounded revision, where an evolving checklist continually accumulates new testing and improvement guidance. A global loop tracks overall quality, preserves the best checkpoint, and detects saturation or regression over long-horizon development.
 >
-> Across 140 GameCraft-Bench tasks, two game engines, and five generators, RSIGame consistently improves game quality under matched development budgets. Notably, iterative development with Qwen3.8-27B reaches 53.90 on Godot and 50.24 on Phaser, surpassing the one-shot performance of substantially stronger GPT-5.5-based generators.
+>Beyond test-time improvement, **RSIGame** further internalizes successful development experience into the generator through training. Across 140 GameCraft-Bench tasks, two game engines, and five generators, **RSIGame** consistently improves game quality under matched development budgets. Notably, experience internalization enables Qwen3.8-27B to reach 61.38 on Godot and 58.53 on Phaser, exceeding GPT-5.5 one-shot scores while reducing Qwen's generation tokens by 11 times.
+
 
 ## What development does
 
@@ -47,11 +48,11 @@ scripted inputs, replayed on both builds.
 
 <table align="center">
 <tr>
-  <td align="center"><img src="assets/demos/lawn_guardians.gif" width="100%"><br><em>Lawn Guardians · tower defence · Godot<br>61.7 → 84.3 over 55 rounds</em></td>
-  <td align="center"><img src="assets/demos/alley_brawlers.gif" width="100%"><br><em>Alley Brawlers · fighting · Phaser<br>56.6 → 66.0 over 41 rounds</em></td>
+  <td align="center"><img src="assets/demos/lawn_guardians.gif" width="100%"><br><em>Lawn Guardians · tower defence · Godot<br>61.7 → 84.3 over 46 rounds</em></td>
+  <td align="center"><img src="assets/demos/alley_brawlers.gif" width="100%"><br><em>Alley Brawlers · fighting · Godot<br>56.6 → 66.0 over 41 rounds</em></td>
 </tr>
 <tr>
-  <td align="center"><img src="assets/demos/block_drop.gif" width="100%"><br><em>Block Drop · puzzle · Phaser<br>37.2 → 50.0</em></td>
+  <td align="center"><img src="assets/demos/block_drop.gif" width="100%"><br><em>Block Cascade · puzzle · Godot<br>37.2 → 50.0</em></td>
   <td align="center"><img src="assets/demos/circuit_gt.gif" width="100%"><br><em>Circuit GT · racing 3D · Godot<br>64 rounds</em></td>
 </tr>
 <tr>
@@ -64,7 +65,7 @@ scripted inputs, replayed on both builds.
 </tr>
 </table>
 
-<div align="center"><em>More at the <a href="https://anonymous312874-rsigame-page.static.hf.space/">project page</a>, where four of these are playable in the browser</em></div>
+<div align="center"><em>More at the <a href="https://anonymous312874-rsigame-page.static.hf.space/">project page</a>, where five of these are playable in the browser</em></div>
 
 ## How it works
 
@@ -88,26 +89,6 @@ high-level guidance, from a person or a stronger model, opens the next stage.
   playtest-and-revise baseline finishes a strong base where it started; the
   Global Quality Monitor is what keeps late rounds from undoing earlier gains.</em>
 </div>
-
-## What this repository is, and is not
-
-It is the RSIGame development loop -- everything that happens once a playable
-game exists -- together with the pipeline that trains on what the loop
-produces. It is not the baselines it is compared against.
-
-- **Baselines.** The comparison arms of the paper (Play2Code, the round-robin
-  direction policy, the multi-agent system of the appendix) are not here. The
-  scored artefacts of every arm are published as data, so the numbers can be
-  checked without the code that produced them.
-- **Initial generation.** Every run starts from a frozen initial project
-  P₀. Producing one is a separate pipeline; the frozen projects themselves
-  are released, so a run can be reproduced from the same starting point
-  without it.
-- **Training on the loop's own sessions.** `data_pipeline/` turns recorded
-  sessions into a supervised corpus and `training/` fine-tunes on it, which is
-  the step that makes the improvement recursive rather than per-run. Neither is
-  needed to run the loop: a development run reads none of their configuration,
-  and the trained adapters are released.
 
 ## Installation
 
@@ -155,18 +136,33 @@ from a toml.
 
 ### Stopping early
 
-The monitor decides which build is the best seen so far, and Value Stop decides
+The monitor decides which build is the best seen so far, and the saturation stop decides
 when development has stopped paying: K consecutive checkpoints with an unchanged
 champion. `[monitor] live` picks how it runs:
 
 | | what happens | what a run costs |
 |---|---|---|
 | `live = false` *(default)* | every round runs; `scripts/vm_replay.py` replays the checkpoints afterwards and `python -m rsigame.monitor.value_stop` reads where the run would have stopped | the full budget, every arm the same — this is what the paper reports |
-| `live = true` | the monitor judges each checkpoint as the run goes and **ends the run** when Value Stop fires | fewer rounds, and arms no longer share a budget |
+| `live = true` | the monitor judges each checkpoint as the run goes and **ends the run** when the saturation stop fires | fewer rounds, and arms no longer share a budget |
 
 A live monitor never kills a round mid-flight, never rolls the tree back, and
 drops itself for the rest of the run if the estimator fails — an outage must not
 look like saturation.
+
+### What a run cost
+
+Every model call the run makes goes through a loopback proxy, so the accounting
+covers the whole loop — Controller, Explorer, Verifier and Monitor, not only the
+repair subprocess. Two files land beside the rounds:
+
+| file | what is in it |
+|---|---|
+| `all_token_calls.jsonl` | one line per call: endpoint, model, prompt/completion/cached/reasoning tokens, cost |
+| `all_token_totals.json` | the same summed, written when the run ends — including a run that stopped early |
+
+The proxy forwards to one upstream and signs with one key, so it only takes over
+an endpoint that already points at that upstream; anything left unmetered (a
+monitor pointed at its own provider, say) is named in the run log. 
 
 ## Scoring
 
@@ -200,7 +196,7 @@ src/rsigame/
   evidence/          what was observed, frozen so a later round can cite it
   polish/            the quality pass: the largest remaining bottleneck
   verify/            replay a repair and decide whether it earned its commit
-  monitor/           the champion across rounds, and Value Stop
+  monitor/           the champion across rounds, and the saturation stop
   eval/              scoring, the proxy estimator, pairwise judging
   agent/             the exploration arm: sessions, probes, the repair agent
   review/            the human review tool used for outer guidance

@@ -69,7 +69,7 @@ def one(branch_root: Path, case: Path, jsonl_out: Path) -> dict:
     rounds_json = str(branch_root / 'runs' / g / 'rounds.json')
     code = f'''
 import json, sys, time
-sys.path.insert(0, {str(RUN / "scripts" / "evogame")!r})
+sys.path.insert(0, {str(RUN / "scripts")!r})
 sys.path.insert(0, {str(RUN)!r})
 import rsigame.monitor.vm_replay as VM
 from rsigame.eval.estimator import pairs as P, score_pair, aggregate, stage_rubric as SR

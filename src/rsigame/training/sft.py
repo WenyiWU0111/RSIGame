@@ -130,6 +130,7 @@ def build_command(a: argparse.Namespace, resume: list[str]) -> list[str]:
         '--per_device_train_batch_size', '1',
         '--gradient_accumulation_steps', '1',
         '--num_train_epochs', '1',
+        '--optim', 'adamw_torch_fused',
         '--learning_rate', str(a.learning_rate),
         '--weight_decay', str(a.weight_decay),
         '--warmup_ratio', str(a.warmup_ratio),
@@ -173,8 +174,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument('--nproc', type=int, default=int(env('RSIGAME_SFT_NPROC', '4')))
     ap.add_argument('--port', type=int, default=0, help='0 asks the kernel for a free one')
     ap.add_argument('--attn', default='sdpa')
-    ap.add_argument('--truncation', default='delete',
-                    help="'delete' drops a row that does not fit rather than cutting it")
+    ap.add_argument('--truncation', default='right',
+                    help="'right' cuts a row that does not fit (the released adapter); 'delete' drops it instead")
     ap.add_argument('--no-quantize', dest='quantize', action='store_false')
     ap.add_argument('--no-rslora', dest='rslora', action='store_false')
     ap.add_argument('--padding-free', action='store_true')
@@ -184,19 +185,20 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument('--lora-alpha', type=int, default=int(env('RSIGAME_SFT_LORA_ALPHA', 32)))
     ap.add_argument('--lora-dropout', type=float,
                     default=float(env('RSIGAME_SFT_LORA_DROPOUT', 0.05)))
-    ap.add_argument('--learning-rate', default=env('RSIGAME_SFT_LEARNING_RATE', '1e-4'))
+    ap.add_argument('--learning-rate', default=env('RSIGAME_SFT_LEARNING_RATE', '5e-5'))
     ap.add_argument('--weight-decay', type=float, default=float(env('RSIGAME_SFT_WEIGHT_DECAY', 0.01)))
     ap.add_argument('--warmup-ratio', type=float, default=float(env('RSIGAME_SFT_WARMUP_RATIO', 0.03)))
     ap.add_argument('--max-grad-norm', type=float, default=float(env('RSIGAME_SFT_MAX_GRAD_NORM', 1.0)))
     ap.add_argument('--scheduler', default=env('RSIGAME_SFT_SCHEDULER', 'cosine'))
-    ap.add_argument('--max-length', type=int, default=int(env('RSIGAME_SFT_MAX_LENGTH', 32768)))
+    ap.add_argument('--max-length', type=int, default=int(env('RSIGAME_SFT_MAX_LENGTH', 57344)))
     ap.add_argument('--save-steps', type=int, default=int(env('RSIGAME_SFT_SAVE_STEPS', 25)))
     ap.add_argument('--save-limit', type=int, default=int(env('RSIGAME_SFT_SAVE_LIMIT', 6)))
     ap.add_argument('--sequence-parallel-size', type=int,
                     default=int(env('RSIGAME_SFT_SEQUENCE_PARALLEL_SIZE', 4)),
                     help='forced by the KV-head count; see the module docstring')
-    ap.add_argument('--loss-scale', default=env('RSIGAME_SFT_LOSS_SCALE', 'default'),
-                    help="'default' supervises every assistant turn; 'last_round' only the target")
+    ap.add_argument('--loss-scale', default=env('RSIGAME_SFT_LOSS_SCALE', 'default+ignore_empty_think'),
+                    help="'default+ignore_empty_think' (released adapter) supervises every assistant turn "
+                         "minus empty think blocks; 'last_round' only the target")
     ap.add_argument('--agent-template', default=env('RSIGAME_SFT_AGENT_TEMPLATE', 'hermes'),
                     help='how the tools column is rendered; must match how the corpus was built')
     a = ap.parse_args(argv)

@@ -13,4 +13,4 @@ probe_steps = 8
 
 [monitor]
 checkpoint_every = 3
-stop_after_k = 3      # Value Stop, as reported in the paper
+stop_after_k = 3      # saturation stop, as reported in the paper

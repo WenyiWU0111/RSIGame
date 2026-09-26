@@ -174,7 +174,7 @@ def main():
                                     'RSIGAME_CONTROLLER_ART_ROUNDS', 'RSIGAME_CONTROLLER_ASSET_CAP', 'RSIGAME_LOOP_LEAN_REPAIR')}},
         indent=1))
     loop_log = open(root / 'og' / f'{g}.loop.out', 'ab')
-    loop = subprocess.Popen([PY, '-u', str(REPO / 'scripts/evogame/metered_loop.py'), g,
+    loop = subprocess.Popen([PY, '-u', str(REPO / 'scripts/metered_loop.py'), g,
                              '--rounds', str(MAX_ROUNDS), '--root', str(root), '--corpus', str(corpus),
                              '--port', str(a.port)],
                             cwd=str(RUN), env=env, stdout=loop_log, stderr=subprocess.STDOUT)
@@ -190,7 +190,7 @@ def main():
                        # Three gradings per comparison, median reported: one
                        # grading flipped a champion between two identical runs.
                        'RSIGAME_MONITOR_PASSES': os.environ.get('RSIGAME_MONITOR_PASSES', '3')})
-    sys.path.insert(0, str(REPO / 'scripts/evogame'))
+    sys.path.insert(0, str(REPO / 'scripts'))
     import rsigame.monitor.vm_replay as VM                                  # reads the env above at import
     (root / 'vm').mkdir(parents=True, exist_ok=True)
     rb = VM.load_rubric(g)

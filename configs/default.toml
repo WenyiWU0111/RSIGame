@@ -95,7 +95,7 @@ live = false                          # RSIGAME_MONITOR_LIVE · run the monitor 
 checkpoint_every = 3                  # RSIGAME_MONITOR_CHECKPOINT_EVERY · replay every Nth round
 passes = 1                            # RSIGAME_MONITOR_PASSES · judging passes per comparison
 champion_gain = 0.05                  # RSIGAME_MONITOR_CHAMPION_GAIN · margin a candidate must beat the champion by
-stop_after_k = 3                      # RSIGAME_MONITOR_STOP_AFTER_K · checkpoints with an unchanged champion before Value Stop fires
+stop_after_k = 3                      # RSIGAME_MONITOR_STOP_AFTER_K · checkpoints with an unchanged champion before the saturation stop fires
 # --- the proxy estimator the champion comparison reads ---
 base_url = "https://openrouter.ai/api/v1"  # RSIGAME_MONITOR_BASE_URL
 cov_min = 0.5                           # RSIGAME_MONITOR_COV_MIN

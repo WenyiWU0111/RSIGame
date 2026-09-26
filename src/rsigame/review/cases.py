@@ -17,7 +17,7 @@
     cases.py --run-id pilot1 --out review/cases/pilot1 \
              --runs RUN_ROOT --r0-runs R0_ROOT --vm RSIGAME_MONITOR_OUT --games g1,g2,...
 
-For each game, the saturated checkpoint P* is what Value Stop would deliver:
+For each game, the saturated checkpoint P* is what the saturation stop would deliver:
 walking the offline Monitor's checkpoints (vm_replay.py), the run stops at the
 first checkpoint where the champion has gone unchanged for STOP_AFTER
 consecutive checkpoints, and P* is the champion at that moment.

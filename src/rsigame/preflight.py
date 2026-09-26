@@ -146,7 +146,7 @@ def main() -> int:
     ok(key, 'a model API key is in the environment')
 
     # 6b. image generation -------------------------------------------------
-    # EvoGame's art rounds call generate_game_assets (unlike the repair line,
+    # RSIGame's art rounds call generate_game_assets (unlike the repair line,
     # which never does). Read from the environment, falling back to
     # agent-test/.env, which the node agent loads with dotenv.
     envf = {}

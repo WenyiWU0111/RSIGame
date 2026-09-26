@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Value Stop: the rule that decides when a run has stopped paying."""
+"""The saturation stop: the rule that decides when a run has stopped paying."""
 import pytest
 
 from rsigame.monitor.value_stop import value_stop

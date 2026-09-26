@@ -49,7 +49,7 @@ def stop_k() -> int:
 
 @dataclass
 class Stop:
-    """Where Value Stop would have ended one game."""
+    """Where the saturation stop would have ended one game."""
     game: str
     checkpoint: int       # index into the checkpoint list
     round: int            # the round that checkpoint corresponds to

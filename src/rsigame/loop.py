@@ -351,28 +351,73 @@ class Game:
              'argv': sys.argv, 'started': time.time()},
             ensure_ascii=False, indent=1))
 
-    def start_proxy(self):
-        """Count the repair subprocess's tokens. It reports none of its own.
+    # Which variables name an endpoint this loop talks to. The repair
+    # subprocess reads its own pair and is handled separately, because it is a
+    # subprocess and inherits the environment we hand it.
+    _PROXIED = ('RSIGAME_JUDGE_QUALITY_JUDGE_BASE_URL', 'RSIGAME_GENERATOR_BASE_URL',
+                'OPENAI_BASE_URL', 'RSIGAME_MONITOR_BASE_URL')
+    _UPSTREAM_DEFAULT = 'https://openrouter.ai/api/v1'
 
-        `log.json`'s `cost` is null on this endpoint, so a round that went
-        silent leaves no record of how long its context had grown -- which is
-        the first thing worth knowing about a session that stopped answering.
+    def start_proxy(self):
+        """Meter every model call this run makes, not only the repair subprocess.
+
+        The repair agent reports nothing of its own -- `log.json`'s `cost` is
+        null on this endpoint -- so a round that went silent leaves no record of
+        how long its context had grown. That was the original reason for the
+        proxy. But metering only the repair half answers "what did the coding
+        agent cost", while the question a cost column is read for is "what did
+        the run cost", and the Controller, Explorer, Verifier and Monitor calls
+        were missing from it entirely.
+
+        ONLY ENDPOINTS THAT ALREADY MATCH. The proxy forwards to one upstream
+        and signs with one key, so pointing a variable at it that named a
+        different host would send those calls somewhere they do not belong --
+        the Monitor in particular defaults to its own provider. A variable is
+        therefore redirected only when it already resolves to this upstream,
+        and the ones left alone are named in the log rather than passed over in
+        silence: a cost column that quietly omits a component is worse than one
+        that says what it omits.
         """
         try:
             from rsigame.eval.token_proxy import TokenProxy
             up = (os.environ.get('RSIGAME_JUDGE_QUALITY_JUDGE_BASE_URL')
                   or os.environ.get('RSIGAME_GENERATOR_BASE_URL')
                   or os.environ.get('OPENAI_BASE_URL')
-                  or 'https://openrouter.ai/api/v1')
+                  or self._UPSTREAM_DEFAULT)
             key = (os.environ.get('OPENROUTER_API_KEY')
                    or os.environ.get('OPENAI_API_KEY') or '')
-            self.proxy = TokenProxy(up, self.dir / 'repair_token_calls.jsonl', key)
+            self.proxy = TokenProxy(up, self.dir / 'all_token_calls.jsonl', key)
             url = self.proxy.start()
             os.environ['RSIGAME_REPAIR_OPENAI_BASE_URL'] = url
             os.environ['RSIGAME_REPAIR_API_KEY'] = key
+            on, off = [], []
+            for var in self._PROXIED:
+                cur = (os.environ.get(var) or self._UPSTREAM_DEFAULT).rstrip('/')
+                if cur == up.rstrip('/'):
+                    os.environ[var] = url
+                    on.append(var)
+                else:
+                    off.append(f'{var}={cur}')
+            log(self.dir, f'  token proxy metering {len(on) + 1} endpoint(s)'
+                          + (f'; NOT metered: {", ".join(off)}' if off else ''))
         except Exception as exc:
             self.proxy = None
             log(self.dir, f'  token proxy did not start: {type(exc).__name__}: {str(exc)[:120]}')
+
+    def stop_proxy(self):
+        """Totals beside the call log, so a reader needs no aggregation step."""
+        if not getattr(self, 'proxy', None):
+            return
+        try:
+            (self.dir / 'all_token_totals.json').write_text(
+                json.dumps(self.proxy.snapshot(), indent=1))
+        except Exception as exc:
+            log(self.dir, f'  token totals not written: {type(exc).__name__}')
+        finally:
+            try:
+                self.proxy.stop()
+            except Exception:
+                pass
 
     def save(self):
         (self.dir / 'rounds.json').write_text(
@@ -2099,7 +2144,7 @@ def main():
     start = len(g.rounds) + 1
     # THE MONITOR, LIVE. Off unless [monitor] live = true. When it is on it
     # judges each checkpoint against the held champion as the run goes and ends
-    # the run once Value Stop fires -- see monitor/live.py for what that costs.
+    # the run once the saturation stop fires -- see monitor/live.py for what that costs.
     from .monitor import live as LIVE
     mon = None
     if LIVE.enabled():
@@ -2224,6 +2269,9 @@ def main():
             art_close(g)
         except Exception:
             log(g.dir, f'  the final reading crashed:\n{traceback.format_exc()[-600:]}')
+    # After every exit path, including the value stop's `break`: a run that
+    # ended early spent what it spent.
+    g.stop_proxy()
     log(g.dir, f'\n{a.game}: {len(g.rounds)} rounds written to {g.dir}')
 
 

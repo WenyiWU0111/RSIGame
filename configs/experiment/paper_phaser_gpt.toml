@@ -1,4 +1,4 @@
-# Paper Table 2: OpenGame + GPT-5.5 generated the base, Phaser, 30 rounds.
+# Paper Table 1 (Phaser): OpenGame + GPT-5.5 generated the base, Phaser, 30 rounds.
 [models]
 loop_model = "z-ai/glm-5.3-flash"      # verification and repair
 play_model = "qwen/qwen3.8-27b"        # test agent
@@ -13,4 +13,4 @@ probe_steps = 8
 
 [monitor]
 checkpoint_every = 3
-stop_after_k = 3      # Value Stop, as reported in the paper
+stop_after_k = 3      # saturation stop, as reported in the paper

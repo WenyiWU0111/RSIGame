@@ -36,9 +36,8 @@ scores (RSIGAME_MONITOR_R0_DIR/<game>/p1), round r from RSIGAME_MONITOR_RUN/runs
 and candidate share no demo name, the champion is re-recorded on the
 candidate's demo inputs (stub judge, one pass).
 
-    source scripts/evogame/env.sh
-    RSIGAME_MONITOR_RUN=runs/evogame_glm30 RSIGAME_MONITOR_R0_DIR=r0_scores/godot_glm RSIGAME_MONITOR_R0_TREES=basegames/godot_glm \
-    RSIGAME_MONITOR_OUT=vm/glm30 python scripts/evogame/vm_replay.py --games handoff/main_glm120.txt [--jobs 6]
+    RSIGAME_MONITOR_RUN=runs/rsigame_glm30 RSIGAME_MONITOR_R0_DIR=r0_scores/godot_glm RSIGAME_MONITOR_R0_TREES=basegames/godot_glm \
+    RSIGAME_MONITOR_OUT=vm/glm30 python scripts/vm_replay.py --games handoff/main_glm120.txt [--jobs 6]
 
 RSIGAME_MONITOR_R0_TREES/<game> (or <game>/game) is the base game's project. Writes
 RSIGAME_MONITOR_OUT/<game>.jsonl (one line per checkpoint, resumable) and RSIGAME_MONITOR_OUT/champ.json.

@@ -4,15 +4,16 @@ This started as a one-off scan before the first publish. It is a test because
 the things it catches come back: a debug script with an absolute path, a key
 pasted into a docstring, an internal endpoint in a config example.
 
-The `internal infra` pattern grew when the training and corpus code was lifted
-in from the cluster it ran on. That code was written against a job scheduler, a
-shared filesystem and an internal package mirror, and each of those leaves a
-recognisable word behind. A reader outside the lab cannot use any of them, so
-none of them belongs here -- the generic name for the thing does.
+Names of people and internal infrastructure are not spelled out here, nor
+hashed (short words hash back by dictionary): a list of them in the repo would
+itself be the leak. They live in tests/leak_terms.local.txt, which is
+gitignored; one term per line, # for comments. Without that file the
+`internal names` check is skipped.
 """
 from __future__ import annotations
 
 import re
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -34,15 +35,51 @@ PATTERNS = {
                                r'|/storage/[A-Za-z_][A-Za-z0-9_.\-]*/'),
     'personal email': re.compile(r'[A-Za-z0-9._%+\-]+@(?!example\.)[A-Za-z0-9.\-]+\.[A-Za-z]{2,}'),
 }
+
+LOCAL_TERMS = ROOT / 'tests' / 'leak_terms.local.txt'
+WORD = re.compile(r'[a-z0-9][a-z0-9.\-]*')
+
 # The scan reads itself, so its own patterns would match. Nothing else is exempt.
 EXEMPT = {'tests/test_no_leaks.py'}
 
 
+def local_terms():
+    if not LOCAL_TERMS.is_file():
+        return set()
+    lines = (l.split('#', 1)[0].strip().lower() for l in LOCAL_TERMS.read_text().splitlines())
+    return {l for l in lines if l}
+
+
+def internal_hits(text: str, terms):
+    """(offset, word) for every word, host suffix or word pair on the local list."""
+    words = [(m.start(), m.group(0).strip('.-')) for m in WORD.finditer(text.lower())]
+    for i, (pos, w) in enumerate(words):
+        cands = {w}
+        parts = w.split('.')
+        cands |= {'.'.join(parts[k:]) for k in range(1, len(parts))}   # a.b.corp.org -> corp.org
+        if i + 1 < len(words):
+            cands.add(f'{w} {words[i + 1][1]}')
+        for c in cands & terms:
+            yield pos, c
+
+
+def _candidates():
+    """What a push would publish: tracked files plus new ones not yet ignored.
+    Gitignored local files (configs/local/, *.local.*) hold this machine's paths
+    on purpose and never leave it. Outside a git checkout, scan everything."""
+    try:
+        out = subprocess.run(['git', 'ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+                             cwd=ROOT, capture_output=True, check=True).stdout
+        return [ROOT / r for r in out.decode().split('\0') if r]
+    except (OSError, subprocess.CalledProcessError):
+        return list(ROOT.rglob('*'))
+
+
 def files():
-    for p in ROOT.rglob('*'):
+    for p in _candidates():
         if not p.is_file() or p.suffix.lower() in BINARY:
             continue
-        if any(part in SKIP_DIRS for part in p.parts):
+        if any(part in SKIP_DIRS for part in p.relative_to(ROOT).parts):
             continue
         rel = str(p.relative_to(ROOT))
         if rel in EXEMPT:
@@ -50,16 +87,20 @@ def files():
         yield p, rel
 
 
-@pytest.mark.parametrize('kind', sorted(PATTERNS))
+@pytest.mark.parametrize('kind', sorted(PATTERNS) + ['internal names'])
 def test_no_leaks(kind):
-    rx = PATTERNS[kind]
+    terms = local_terms() if kind not in PATTERNS else set()
+    if kind not in PATTERNS and not terms:
+        pytest.skip('no tests/leak_terms.local.txt on this machine')
     hits = []
     for p, rel in files():
         try:
             text = p.read_text(errors='replace')
         except OSError:
             continue
-        for m in rx.finditer(text):
-            line = text[:m.start()].count('\n') + 1
-            hits.append(f'{rel}:{line}: {m.group(0)[:60]}')
+        found = (((m.start(), m.group(0)) for m in PATTERNS[kind].finditer(text))
+                 if kind in PATTERNS else internal_hits(text, terms))
+        for pos, s in found:
+            line = text[:pos].count('\n') + 1
+            hits.append(f'{rel}:{line}: {s[:60]}')
     assert not hits, f'{kind} found:\n  ' + '\n  '.join(hits[:20])

@@ -20,7 +20,7 @@ same budget. Set `[monitor] live = true` when that is what you want to study.
 
 WHAT IT DOES. At each checkpoint boundary it makes the same decision the
 offline sweep makes -- this checkpoint against the held champion, adopt or keep
--- appends it to the same champion trace, and applies Value Stop: once the
+-- appends it to the same champion trace, and applies the saturation stop: once the
 champion has survived K consecutive checkpoints, the run ends at the next round
 boundary and the champion is what it delivers.
 
@@ -81,7 +81,7 @@ class LiveMonitor:
         return rec
 
     def stop(self) -> Stop | None:
-        """Value Stop over the trace so far, or None while it is still paying.
+        """The saturation stop over the trace so far, or None while it is still paying.
 
         `value_stop` answers for a finished trace, so a mid-run call has to
         ignore its "never settled" fallback: a run that has not saturated yet

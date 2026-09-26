@@ -46,7 +46,7 @@ from . import cases as C
 def stage_summary(recs: list[dict], rounds: list[dict]) -> str:
     """What happened during the stage: how each checkpoint was judged and what
     each round worked on. The first round's version of this field was computed
-    from the Value Stop replay; here the branch produced it itself, so the
+    from the saturation-stop replay; here the branch produced it itself, so the
     record is read directly."""
     out = [f'Autonomous development rounds completed: {len(rounds)}', '',
            'Champion (best build so far), checked every 3 rounds:']
