@@ -2,7 +2,7 @@ RSIGame
 Copyright 2026 The RSIGame authors
 
 This product includes software developed as part of OpenGame
-(https://github.com/OpenDCAI/OpenGame), licensed under the Apache License 2.0.
+(https://github.com/leigest519/OpenGame), licensed under the Apache License 2.0.
 
 No OpenGame source is redistributed here. The Phaser engine adapter drives an
 OpenGame checkout that the user installs separately; `patches/` holds the

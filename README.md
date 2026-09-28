@@ -6,8 +6,8 @@
 
 **Play. Verify. Evolve.**
 
-[![Project Page](https://img.shields.io/badge/Project-Page-blue.svg)](https://anonymous312874-rsigame-page.static.hf.space/)
-[![Datasets](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Datasets-yellow)](https://huggingface.co/datasets/anonymous312874/rsigame-scoring-artifacts)
+[![Project Page](https://img.shields.io/badge/Project-Page-blue.svg)](https://huggingface.co/spaces/RSIGame/rsigame-page)
+[![Datasets](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Datasets-yellow)](https://huggingface.co/RSIGame)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/python-%3E%3D3.11-brightgreen.svg)](https://www.python.org/)
 
@@ -65,7 +65,7 @@ scripted inputs, replayed on both builds.
 </tr>
 </table>
 
-<div align="center"><em>More at the <a href="https://anonymous312874-rsigame-page.static.hf.space/">project page</a>, where five of these are playable in the browser</em></div>
+<div align="center"><em>More at the <a href="https://huggingface.co/spaces/RSIGame/rsigame-page">project page</a>, where five of these are playable in the browser</em></div>
 
 ## How it works
 
@@ -211,14 +211,18 @@ patches/             the changes this work applies to GameCraft-Bench
 ## Data
 
 Base games, run trees, recordings and scores are not in this repo. The scoring
-artefacts every number in the paper is read from are at
-[anonymous312874/rsigame-scoring-artifacts](https://huggingface.co/datasets/anonymous312874/rsigame-scoring-artifacts); the base games, run trees
-and recordings are released with the camera-ready.
+artefacts every number in the paper is read from are on Hugging Face at
+[RSIGame/RSIGame-TableArtifacts](https://huggingface.co/datasets/RSIGame/RSIGame-TableArtifacts):
+for every row of Tables 1 and 2, the base game, the build that was scored, and
+the judge's records.
 
-The supervised corpus and the adapters trained on it are released the same way:
-`data_pipeline/` documents how the corpus is built from recordings and
-`training/` how one arm is trained, so both can be rebuilt rather than taken on
-trust.
+> **Coming soon.** The base games, run trees, supervised corpus and model
+> weights are going through our company's internal review, and will be released
+> under [RSIGame](https://huggingface.co/RSIGame) as soon as it is approved.
+
+Until then, `data_pipeline/` documents how the corpus is built from recordings
+and `training/` how one arm is trained, so both can be rebuilt rather than taken
+on trust.
 
 ## Notes
 
@@ -242,9 +246,12 @@ redistributed here.
 ## Citation
 
 ```bibtex
-@inproceedings{rsigame2027,
+@misc{wu2026rsigame,
   title  = {RSIGame: Autonomous Agentic Game Development with Recursive Self-improvement},
-  author = {TBA},
-  year   = {2027}
+  author = {Wu, Wenyi and Fu, Minghao and You, Jieyu and Zhou, Kun and Liu, Siqi and
+            Salvi, Aayush and Lin, Yiheng and Zhang, Ce and Lan, Xiaohan and Zhu, Jiahui and
+            Zhong, Yujie and She, Qi and Huang, Biwei},
+  year   = {2026},
+  url    = {https://github.com/WenyiWU0111/RSIGame}
 }
 ```
