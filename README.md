@@ -21,10 +21,10 @@ evolution through high-level guidance.**
 
 </div>
 
-https://github.com/user-attachments/assets/5d103883-abab-4a40-bc73-11f7b2c0ea64
+https://github.com/user-attachments/assets/51b2c303-0eb3-406f-8b02-b53dfa715683
 
 <div align="center">
-  <em>A 72-second narrated walkthrough &mdash; the loop, worked through one
+  <em>A 78-second narrated walkthrough &mdash; the loop, worked through one
   game from its first playable version to the build development delivers, and
   what it does across the benchmark. Unmute to play with sound.</em>
 </div>
