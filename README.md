@@ -21,11 +21,12 @@ evolution through high-level guidance.**
 
 </div>
 
+https://github.com/user-attachments/assets/5d103883-abab-4a40-bc73-11f7b2c0ea64
+
 <div align="center">
-  <a href="assets/rsigame_demo.mp4"><img src="assets/rsigame_demo_poster.png" alt="Watch the RSIGame walkthrough" width="100%"></a>
-  <br><em>A 72-second narrated walkthrough &mdash; the loop, worked through one
+  <em>A 72-second narrated walkthrough &mdash; the loop, worked through one
   game from its first playable version to the build development delivers, and
-  what it does across the benchmark. Click to play, with sound.</em>
+  what it does across the benchmark. Unmute to play with sound.</em>
 </div>
 
 <div align="center">
