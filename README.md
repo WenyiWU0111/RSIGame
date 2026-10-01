@@ -6,7 +6,7 @@
 
 **Play. Verify. Evolve.**
 
-[![arXiv](https://img.shields.io/badge/arXiv-2609.39045-b31b1b.svg?logo=arxiv&logoColor=white)](https://arxiv.org/abs/2609.39045)
+[![arXiv](assets/arxiv-badge.svg)](https://arxiv.org/abs/2609.39045)
 [![Project Page](https://img.shields.io/badge/Project-Page-blue.svg)](https://huggingface.co/spaces/RSIGame/rsigame-page)
 [![Datasets](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Datasets-yellow)](https://huggingface.co/RSIGame)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
