@@ -6,6 +6,7 @@
 
 **Play. Verify. Evolve.**
 
+[![arXiv](https://img.shields.io/badge/arXiv-2609.39045-b31b1b.svg)](https://arxiv.org/abs/2609.39045)
 [![Project Page](https://img.shields.io/badge/Project-Page-blue.svg)](https://huggingface.co/spaces/RSIGame/rsigame-page)
 [![Datasets](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Datasets-yellow)](https://huggingface.co/RSIGame)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
@@ -253,6 +254,9 @@ redistributed here.
             Salvi, Aayush and Lin, Yiheng and Zhang, Ce and Lan, Xiaohan and Zhu, Jiahui and
             Zhong, Yujie and She, Qi and Huang, Biwei},
   year   = {2026},
-  url    = {https://github.com/WenyiWU0111/RSIGame}
+  eprint = {2609.39045},
+  archivePrefix = {arXiv},
+  primaryClass  = {cs.CL},
+  url    = {https://arxiv.org/abs/2609.39045}
 }
 ```
