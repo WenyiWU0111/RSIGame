@@ -4,6 +4,8 @@ Recorded agent sessions in, a supervised fine-tuning corpus out. This is the
 half of recursive self-improvement that closes the loop: the model is trained
 on sessions the development loop itself produced.
 
+![RSIGame SFT data pipeline](pipeline.png)
+
 ## The order the steps run in
 
 ```

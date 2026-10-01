@@ -19,10 +19,43 @@ python -m rsigame.training metrics --run /durable/s1s2s3 --out loss.csv
 
 ## What one run is
 
-LoRA (rank 16, alpha 32, rsLoRA) on every linear module of a 27B base, 4-bit
-NF4 resident weights with bf16 compute, batch size 1, one epoch, cosine
-schedule, 57,344-token context, AdamW (fused), learning rate 5e-5. Three arms — `s1` generation only, `s1s2`
-+ plan, `s1s2s3` + repair — sharing the same generation rows by construction.
+One LoRA adapter over a 4-bit-quantized 27B base, trained for one epoch; the
+exact configuration is the table below. Three arms — `s1` generation only,
+`s1s2` + plan, `s1s2s3` + repair — share the same generation rows by
+construction, so any difference between them is attributable to the added data.
+
+## Hyperparameters
+
+The released-adapter configuration, held fixed across all three arms (only the
+corpus changes). These match `configs/default_training.toml`.
+
+| configuration | value |
+|---|---|
+| base model | Qwen3.8-27B |
+| adaptation | LoRA |
+| LoRA rank _r_ | 16 |
+| LoRA alpha | 32 |
+| LoRA dropout | 0.05 |
+| LoRA targets | all linear projections (496 modules) |
+| rank-stabilized LoRA (rsLoRA) | yes |
+| trainable parameters | 116.73 M (0.763%) |
+| base-weight precision | 4-bit NF4 |
+| double quantization | yes |
+| compute precision | bfloat16 |
+| maximum context length | 57,344 tokens |
+| truncation strategy | right |
+| epochs | 1 |
+| optimizer | AdamW (fused) |
+| learning rate | 5e-5 |
+| learning-rate schedule | cosine |
+| warmup ratio | 0.03 |
+| weight decay | 0.01 |
+| max gradient norm | 1.0 |
+| per-device batch size | 1 |
+| gradient accumulation | none |
+| sequence-parallel degree | 4 |
+| loss scale | default+ignore_empty_think |
+| hardware | 4 × H100 80 GB |
 
 ## The settings that are not defaults
 
