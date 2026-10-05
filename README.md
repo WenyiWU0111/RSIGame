@@ -7,6 +7,7 @@
 **Play. Verify. Evolve.**
 
 [![arXiv](assets/arxiv-badge.svg)](https://arxiv.org/abs/2609.39045)
+[![HF Daily Papers](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fhuggingface.co%2Fapi%2Fpapers%2F2609.39045&query=%24.upvotes&label=HF%20Daily%20Papers&suffix=%20upvotes&color=FFD21E&logo=huggingface&cacheSeconds=1800)](https://huggingface.co/papers/2609.39045)
 [![Project Page](https://img.shields.io/badge/Project-Page-blue.svg)](https://huggingface.co/spaces/RSIGame/rsigame-page)
 [![Datasets](https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Datasets-yellow)](https://huggingface.co/RSIGame)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
@@ -21,6 +22,12 @@ saturates, then preserving the best version or opening a new stage of
 evolution through high-level guidance.**
 
 </div>
+
+## 📰 News
+
+- **2026.10** 🔥 RSIGame is on [Hugging Face Daily Papers](https://huggingface.co/papers/2609.39045) (#10 on October 1, 2026) — <a href="https://huggingface.co/papers/2609.39045"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fhuggingface.co%2Fapi%2Fpapers%2F2609.39045&query=%24.upvotes&label=HF%20Daily%20Papers&suffix=%20upvotes&color=FFD21E&logo=huggingface&cacheSeconds=1800" alt="HF Daily Papers upvotes" align="top"></a> and counting. Thank you for the support!
+
+<!-- Daily Papers rank is a snapshot taken October 5, 2026 (UTC): https://huggingface.co/papers/date/2026-10-01 -->
 
 https://github.com/user-attachments/assets/51b2c303-0eb3-406f-8b02-b53dfa715683
 
