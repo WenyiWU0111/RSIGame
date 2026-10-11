@@ -31,7 +31,6 @@
 # local_models =                        # RSIGAME_MODELS_LOCAL_MODELS · unset means off
 loop_model = "z-ai/glm-5.3-flash"       # RSIGAME_MODELS_LOOP_MODEL · what the paper ran
 play_model = "qwen/qwen3.8-27b"         # RSIGAME_MODELS_PLAY_MODEL · what the paper ran
-verifier_judge_model = "gpt-5.5"        # RSIGAME_MODELS_VERIFIER_JUDGE_MODEL
 
 [endpoints]
 # Where the models are served.

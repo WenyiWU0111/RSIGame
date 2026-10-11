@@ -79,7 +79,6 @@
  "models.local_models": "RSIGAME_MODELS_LOCAL_MODELS",
  "models.loop_model": "RSIGAME_MODELS_LOOP_MODEL",
  "models.play_model": "RSIGAME_MODELS_PLAY_MODEL",
- "models.verifier_judge_model": "RSIGAME_MODELS_VERIFIER_JUDGE_MODEL",
  "monitor.base_url": "RSIGAME_MONITOR_BASE_URL",
  "monitor.cov_min": "RSIGAME_MONITOR_COV_MIN",
  "monitor.fail_dir": "RSIGAME_MONITOR_FAIL_DIR",
