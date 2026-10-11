@@ -16,6 +16,7 @@
 # bench =                               # GAMECRAFT_BENCH · unset means off
 # bench_godot_bin =                     # GAMECRAFT_BENCH_GODOT_BIN · no default; falls back to shutil.which('godot')
 # bench_tasks =                         # GAMECRAFT_BENCH_TASKS · no default; falls back to str(paths.bench_tasks())
+# opengame_agent_test =                 # RSIGAME_PATHS_OPENGAME_AGENT_TEST · no default; <OpenGame-RSIGame checkout>/agent-test, holds scripts/agent_repair.ts
 # env =                                 # RSIGAME_PATHS_ENV · no default; falls back to Path.cwd() / '.env'
 # evidence_root =                       # RSIGAME_PATHS_EVIDENCE_ROOT · unset means off
 # python =                              # RSIGAME_PATHS_PYTHON · no default; falls back to sys.executable

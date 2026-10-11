@@ -31,15 +31,20 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(prog='rsigame', description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('-c', '--config', help='experiment overlay (name under configs/experiment or a path)')
+    # Accepted after the subcommand too (`rsigame develop <task> -c X`, as the
+    # README writes it): without this the overlay was silently dropped there.
+    over = argparse.ArgumentParser(add_help=False)
+    over.add_argument('-c', '--config', dest='sub_config', default=None)
     sub = ap.add_subparsers(dest='cmd', required=True)
-    sub.add_parser('config', help='print the resolved configuration')
-    sub.add_parser('check', help='validate configuration, paths and keys')
-    d = sub.add_parser('develop', help='run the development loop on one game')
+    sub.add_parser('config', parents=[over], help='print the resolved configuration')
+    sub.add_parser('check', parents=[over], help='validate configuration, paths and keys')
+    d = sub.add_parser('develop', parents=[over], help='run the development loop on one game')
     d.add_argument('game')
     d.add_argument('--rounds', type=int, default=None)
-    s = sub.add_parser('score', help='score the checkpoints of a finished run')
+    s = sub.add_parser('score', parents=[over], help='score the checkpoints of a finished run')
     s.add_argument('run_dir')
     a, rest = ap.parse_known_args(argv)
+    a.config = getattr(a, 'sub_config', None) or a.config
 
     from . import config
     if a.cmd == 'config':

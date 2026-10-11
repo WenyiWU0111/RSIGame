@@ -42,6 +42,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from rsigame import paths
+
 HERE = Path(__file__).resolve().parent
 RUN = HERE.parent
 REPO = RUN.parent

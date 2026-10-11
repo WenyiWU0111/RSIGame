@@ -59,8 +59,13 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
+from rsigame import paths
 
-AGENT_TEST = Path(__file__).resolve().parents[2]
+
+# Where scripts/agent_repair.ts lives: agent-test/ of the OpenGame-RSIGame
+# checkout ([paths] opengame_agent_test). Resolved on first use, so importing
+# this module does not need it configured.
+AGENT_TEST = paths.lazy_opengame_agent_test()
 NODE_BIN = os.environ.get("RSIGAME_JUDGE_NODE_BIN", "node")   # PATH node from PATH;set RSIGAME_JUDGE_NODE_BIN to pin one
 _SKIP_DIRS = {"node_modules", "dist", ".git", ".qwen"}
 

@@ -101,35 +101,71 @@ high-level guidance, from a person or a stronger model, opens the next stage.
 
 ## Installation
 
+Requires **Linux** (or macOS): the loop runs its agents in process groups and
+cleans them up with `os.killpg`, which Windows does not have.
+
 ```bash
-git clone <this repo> && cd rsigame
+git clone https://github.com/WenyiWU0111/RSIGame.git && cd RSIGame
 pip install -e .
 ```
 
 **GameCraft-Bench** supplies the tasks, rubrics and replay harness. It is a
-separate checkout; install it into the same environment and point the config at
-it:
+separate checkout, patched by the files in `patches/` (see `patches/README.txt`)
+and installed into the same environment:
 
 ```bash
+git clone https://github.com/FreedomIntelligence/gamecraft-bench.git ../gamecraft-bench
+git -C ../gamecraft-bench checkout a43347534374df9a0c1a6c001aa9380862783f6d
+git -C ../gamecraft-bench apply ../RSIGame/patches/gamecraft-bench_rsigame_scoring.patch
+git -C ../gamecraft-bench apply ../RSIGame/patches/gamecraft-bench_openrouter_provider_pin.patch
 pip install -e ../gamecraft-bench
 ```
 
-You also need **Godot 4** for the Godot line, and **Node 20+** with an
-[OpenGame](https://github.com/leigest519/OpenGame) checkout for the Phaser line.
+**The repair agent** is a Node script in
+[OpenGame-RSIGame](https://github.com/WenyiWU0111/OpenGame-RSIGame), our fork of
+[OpenGame](https://github.com/leigest519/OpenGame). Both engines need it.
+Upstream OpenGame does not have `agent_repair.ts` or the changes it depends on.
+It needs **Node 20+**:
+
+```bash
+git clone https://github.com/WenyiWU0111/OpenGame-RSIGame.git ../OpenGame-RSIGame
+cd ../OpenGame-RSIGame && npm install && npm run build && cd -
+```
+
+**Godot 4.6.2** for the Godot line, and the replay tools GameCraft-Bench drives:
+
+```bash
+sudo apt-get install -y --no-install-recommends xvfb xdotool ffmpeg \
+    libxcursor1 libxinerama1 libxrandr2 libxi6 libgl1 libegl1
+# Godot: https://github.com/godotengine/godot/releases/tag/4.6.2-stable
+```
 
 ## Quick start
 
 ```bash
-cp .env.example .env            # one model API key is enough
-$EDITOR configs/default.toml    # [paths]: the bench checkout and the Godot binary
+cp .env.example .env            # a model API key, plus the image-generation keys for art rounds
+$EDITOR configs/default.toml    # [paths]: bench, bench_godot_bin, opengame_agent_test
 
 rsigame config                  # what a run would actually use, resolved
-rsigame check                   # paths, keys and models, before anything runs
-rsigame develop <task> -c paper_godot_gpt
+rsigame check                   # paths, keys and the repair agent, before anything runs
 ```
 
-`rsigame check` is worth running first: a missing bench path or key used to
-surface at round 12, not at round 0.
+A run develops a base game from a **corpus** directory with one sub-directory per
+task. The base games behind Table 1 are on Hugging Face. For example, the GPT-5.5
+Godot bases are in
+[`t1/gpt55/base/games.tar.gz`](https://huggingface.co/datasets/RSIGame/RSIGame-TableArtifacts/tree/main/t1/gpt55/base):
+
+```bash
+huggingface-cli download RSIGame/RSIGame-TableArtifacts t1/gpt55/base/games.tar.gz \
+    --repo-type dataset --local-dir .
+mkdir -p corpus_godot_gpt55 && tar -xzf t1/gpt55/base/games.tar.gz -C corpus_godot_gpt55
+rsigame -c paper_godot_gpt develop puzzle-sokoban-dungeon \
+    --corpus corpus_godot_gpt55 --root runs/paper_godot_gpt
+```
+
+`-c` can go before or after the subcommand. `rsigame check` is worth running
+first: a missing bench path, key or repair agent used to surface at round 12,
+not at round 0.
 
 ### Configuration
 

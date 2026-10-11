@@ -2,6 +2,7 @@
  "paths.bench": "GAMECRAFT_BENCH",
  "paths.bench_godot_bin": "GAMECRAFT_BENCH_GODOT_BIN",
  "paths.bench_tasks": "GAMECRAFT_BENCH_TASKS",
+ "paths.opengame_agent_test": "RSIGAME_PATHS_OPENGAME_AGENT_TEST",
  "endpoints.openai_base_url": "OPENAI_BASE_URL",
  "assets.asset_ledger": "OPENGAME_ASSET_LEDGER",
  "assets.asset_round_cap": "OPENGAME_ASSET_ROUND_CAP",

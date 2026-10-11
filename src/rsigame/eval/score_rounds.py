@@ -77,7 +77,7 @@ def job(corpus: str, game: str, k: int) -> tuple[str, int, str]:
         shutil.rmtree(out / 'demos', ignore_errors=True)
 
 
-def main() -> int:
+def main(argv=None) -> int:
     from rsigame import config
     config.ensure()
     ap = argparse.ArgumentParser()
@@ -85,7 +85,7 @@ def main() -> int:
     ap.add_argument('--points', default='0,2,4,6,8')
     ap.add_argument('--lines', type=int, default=4)
     ap.add_argument('--games', default='')
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
 
     pts = [int(x) for x in a.points.split(',') if x.strip()]
     if a.games:

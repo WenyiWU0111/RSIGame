@@ -40,7 +40,7 @@ Two things this module refuses to do, both learned from real output:
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 import re
 from pathlib import Path
