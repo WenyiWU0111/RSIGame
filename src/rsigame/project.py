@@ -276,6 +276,12 @@ def build(work: Path) -> dict:
     return {'ok': ok, 'wall_s': round(time.time() - t0, 1), 'tail': tail}
 
 
+# Resource suffixes Godot imports. A file with one of these and no `.import`
+# beside it is what an import pass fixes.
+_IMPORTABLE = ('.png', '.jpg', '.jpeg', '.webp', '.svg', '.bmp',
+               '.ogg', '.wav', '.mp3', '.ttf', '.otf')
+
+
 def unimported(work: Path) -> list:
     """Resource files with no `.import` beside them."""
     out = []

@@ -127,16 +127,22 @@ def main() -> int:
         ok(shutil.which(tool) is not None, f'{tool} is on PATH (replay needs it)')
 
     # 5. node and the agent CLI --------------------------------------------
+    # [judge] node_bin is a DIRECTORY prepended to PATH (repair.py); its default
+    # is the bare word "node", which means "whatever is on PATH".
     nb = os.environ.get('RSIGAME_JUDGE_NODE_BIN')
-    node = (Path(nb) / 'node') if nb else (shutil.which('node') or '')
+    node = (Path(nb) / 'node') if nb and Path(nb).is_dir() else (shutil.which('node') or '')
     if ok(bool(node) and Path(node).exists(), f'node found: {node}'):
         v = subprocess.run([str(node), '--version'], capture_output=True,
                            text=True).stdout.strip()
         major = int(v.lstrip('v').split('.')[0] or 0)
         ok(major >= 18, f'node is {v} (>= 18 required; the CLI is ESM)')
-    cli = repo.parent / 'dist' / 'cli.js'
+    ogt = Path(os.environ.get('RSIGAME_PATHS_OPENGAME_AGENT_TEST') or '.')
+    ok((ogt / 'scripts' / 'agent_repair.ts').is_file(),
+       f'the repair agent exists: {ogt / "scripts" / "agent_repair.ts"}'
+       '  -- set [paths] opengame_agent_test to agent-test/ of the OpenGame-RSIGame checkout')
+    cli = ogt.parent / 'dist' / 'cli.js'
     ok(cli.is_file(), f'the agent CLI bundle exists: {cli}'
-                      '  -- build it with packages/sdk-typescript/scripts/build.js')
+                      '  -- run `npm install && npm run build` in the OpenGame-RSIGame checkout')
 
     # 6. models and keys ----------------------------------------------------
     for k in ('RSIGAME_MODELS_PLAY_MODEL', 'RSIGAME_MODELS_LOOP_MODEL', 'RSIGAME_REPAIR_MODEL'):

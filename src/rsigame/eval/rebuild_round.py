@@ -25,7 +25,7 @@ the run's own `work/` is the check, and it is what `--verify` does.
   python rebuild_round.py --run ... --game X --verify
 """
 from __future__ import annotations
-import argparse, hashlib, shutil, sys
+import argparse, hashlib, os, shutil, sys
 from pathlib import Path
 
 RUN = Path(__file__).resolve().parent

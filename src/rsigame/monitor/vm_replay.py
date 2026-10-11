@@ -50,6 +50,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+# score_game.py lives in rsigame/eval; it is run as a script from there.
+LOOP = Path(__file__).resolve().parents[1] / "eval"
+
 from ..eval.estimator import pairs as P, score_pair, aggregate
 from ..eval.estimator.rubric import load as load_rubric
 

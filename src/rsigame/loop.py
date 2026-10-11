@@ -2119,7 +2119,8 @@ def one_round(g: Game, r: int, rec: dict) -> dict:
     return rec
 
 
-def main():
+def main(argv=None):
+    # `rsigame develop` passes its argv here; `python -m rsigame.loop` passes none.
     from . import config
     config.ensure()
     import argparse
@@ -2129,7 +2130,7 @@ def main():
     ap.add_argument('--root', default='newloop_cs10')
     ap.add_argument('--corpus', default='godot/corpus_casestudy')
     ap.add_argument('--port', type=int, default=7980)
-    a = ap.parse_args()
+    a = ap.parse_args(argv)
 
     # ABSOLUTE, ALWAYS. The repair agent runs as a subprocess with its own cwd
     # (the agent repo), and it is handed the prompt file by the path this

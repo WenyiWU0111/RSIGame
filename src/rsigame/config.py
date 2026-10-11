@@ -143,7 +143,10 @@ def load(overlay: str | Path | None = None, *, export: bool = True,
         if not p.is_file():
             p = CONFIGS / 'experiment' / f'{overlay}.toml'
         cfg.data = _merge(cfg.data, _read(p)); cfg.sources.append(str(p))
-    load_env_file()
+    # `[paths] env` / RSIGAME_PATHS_ENV says where .env is; it used to be
+    # documented but never read here, so only <repo>/.env ever loaded.
+    envp = os.environ.get('RSIGAME_PATHS_ENV') or cfg.get('paths.env')
+    load_env_file(Path(envp) if envp else None)
     if export:
         cfg.export()
     if validate_paths:
@@ -205,6 +208,21 @@ def check(cfg: Config) -> list[str]:
             problems.append(f'{dotted} is unset ({label})')
         elif not Path(v).exists():
             problems.append(f'{dotted} points at nothing: {v}')
+    # The repair agent is a node script in the OpenGame-RSIGame fork, not in
+    # this repo. Without it every repair round fails, which `check` used to
+    # report as fine.
+    ogt = cfg.get('paths.opengame_agent_test') or os.environ.get(
+        _ENVMAP['paths.opengame_agent_test'], '')
+    if not ogt:
+        problems.append('paths.opengame_agent_test is unset (agent-test/ of the '
+                        'OpenGame-RSIGame checkout; the repair agent runs there)')
+    else:
+        ogt = Path(ogt)
+        for need, hint in ((ogt / 'scripts' / 'agent_repair.ts', 'is it the OpenGame-RSIGame fork?'),
+                           (ogt.parent / 'node_modules', 'run `npm install` in the fork'),
+                           (ogt.parent / 'dist' / 'cli.js', 'run `npm run build` in the fork')):
+            if not need.exists():
+                problems.append(f'paths.opengame_agent_test: {need} is missing ({hint})')
     if not any(os.environ.get(k) for k in SECRETS):
         problems.append('no model API key in the environment or .env '
                         f'(one of: {", ".join(SECRETS)})')

@@ -55,6 +55,18 @@ def godot_bin() -> Path:
     return _need('GAMECRAFT_BENCH_GODOT_BIN', 'the Godot binary used to build and replay')
 
 
+def opengame_agent_test() -> Path:
+    """`agent-test/` of the OpenGame-RSIGame checkout: the repair agent
+    (`scripts/agent_repair.ts`) runs there, on that fork's modified OpenGame
+    packages. Upstream OpenGame does not have it."""
+    return _need('RSIGAME_PATHS_OPENGAME_AGENT_TEST',
+                 'the agent-test/ directory of the OpenGame-RSIGame checkout')
+
+
+def lazy_opengame_agent_test() -> 'LazyPath':
+    return LazyPath(opengame_agent_test)
+
+
 def run_root() -> Path:
     """Where runs, snapshots and scores are written. Not inside the repo."""
     v = os.environ.get('RSIGAME_PATHS_RUN')
