@@ -261,11 +261,9 @@ artefacts every number in the paper is read from are on Hugging Face at
 for every row of Tables 1 and 2, the base game, the build that was scored, and
 the judge's records.
 
-> **Coming soon.** The base games, run trees, supervised corpus and model
-> weights are going through our company's internal review, and will be released
-> under [RSIGame](https://huggingface.co/RSIGame) as soon as it is approved.
+> The base games, run trees, supervised corpus and model are all released in [RSIGame](https://huggingface.co/RSIGame).
 
-Until then, `data_pipeline/` documents how the corpus is built from recordings
+`data_pipeline/` documents how the corpus is built from recordings
 and `training/` how one arm is trained, so both can be rebuilt rather than taken
 on trust.
 
